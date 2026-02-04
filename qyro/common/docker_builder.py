@@ -70,6 +70,19 @@ class QyroDockerBuilder:
             with open(file_path, 'w') as f:
                 f.write(content)
 
+        # AI Agents
+        for block in blocks.get('agent', []):
+            name = block['name']
+            content = block['content']
+            deps['python'].update(block.get('dependencies', [])) # Agents are Python-based
+
+            # Inject adapter import
+            injected_code = "from qyro.adapters.language_adapters.agent.agent_adapter import init, on, _agent_instance\n" + content
+
+            file_path = self.modules_dir / f"{name}_agent.py"
+            with open(file_path, 'w') as f:
+                f.write(injected_code)
+
         # Rust
         for block in blocks.get('rust', []) + blocks.get('rs', []):
             name = block['name']

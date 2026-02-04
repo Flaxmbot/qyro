@@ -5,6 +5,7 @@ Qyro Command Line Interface
 import sys
 import os
 import click
+import subprocess
 import time
 import threading
 from pathlib import Path
@@ -276,6 +277,30 @@ def init():
     """Initialize a new project."""
     from .interactive import init_project
     init_project()
+
+@main.command()
+@click.argument('qyro_file', type=click.Path(exists=True))
+@click.option('--k8s', is_flag=True, help="Generate Kubernetes manifests")
+def deploy(qyro_file, k8s):
+    """Deploy the application."""
+    if k8s:
+        try:
+            from qyro.common.k8s_builder import QyroK8sBuilder
+            from qyro.common.parser import QyroParser
+
+            console.print(f"[bold green]Generating Kubernetes manifests for {qyro_file}...[/bold green]")
+
+            parser = QyroParser()
+            parser.parse_file(qyro_file)
+
+            builder = QyroK8sBuilder(qyro_file)
+            builder.build(parser.get_named_blocks())
+
+        except Exception as e:
+            console.print(f"[red]Deploy failed: {e}[/red]")
+            sys.exit(1)
+    else:
+        console.print("[yellow]Please specify a deployment target (e.g. --k8s)[/yellow]")
 
 if __name__ == "__main__":
     main()

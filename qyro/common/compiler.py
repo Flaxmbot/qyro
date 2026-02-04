@@ -16,6 +16,7 @@ from .logging import get_logger
 from .errors import NexusError, ErrorCode # Keep legacy name for now or update errors.py
 from .platform import get_platform
 from .toolchain_validator import ToolchainValidator
+from qyro.adapters.language_adapters.agent.agent_adapter import QyroAgent
 
 logger = get_logger("qyro.compiler")
 
@@ -111,6 +112,15 @@ class QyroCompiler:
             code, meta, idx = get_block_info(block, i)
             filename = f"qyro_module_py_{idx}.py"
             with open(filename, "w", encoding='utf-8') as f: f.write(code)
+            artifacts.append({'type': 'py', 'src': filename})
+
+        # AI Agents
+        for i, block in enumerate(blocks.get('agent', [])):
+            code, meta, idx = get_block_info(block, i)
+            # Inject adapter import
+            injected_code = "from qyro.adapters.language_adapters.agent.agent_adapter import init, on, _agent_instance\n" + code
+            filename = f"qyro_agent_{idx}.py"
+            with open(filename, "w", encoding='utf-8') as f: f.write(injected_code)
             artifacts.append({'type': 'py', 'src': filename})
 
         # Node/TS
@@ -245,4 +255,3 @@ qyro = {{ path = "{adapter_path}" }}
 
         # Return success with type java
         return CompilationResult(True, {'type': 'java', 'class': class_name, 'cp': '.'})
-
