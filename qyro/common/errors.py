@@ -78,54 +78,6 @@ class QyroError(Exception):
         }
 
 
-class ErrorCode:
-    """Standardized error codes across all Qyro components."""
-    
-    # Success
-    SUCCESS = 0
-    
-    # Memory Errors (1xxx)
-    MEMORY_NOT_FOUND = 1001
-    MEMORY_LOCK_TIMEOUT = 1002
-    MEMORY_CORRUPTION = 1003
-    MEMORY_FULL = 1004
-    MEMORY_ACCESS_DENIED = 1005
-    
-    # JSON/Schema Errors (2xxx)
-    JSON_PARSE_ERROR = 2001
-    JSON_SCHEMA_MISMATCH = 2002
-    JSON_ENCODE_ERROR = 2003
-    SCHEMA_NOT_FOUND = 2004
-    SCHEMA_INVALID = 2005
-    
-    # Auth Errors (3xxx)
-    AUTH_FAILED = 3001
-    AUTH_EXPIRED = 3002
-    AUTH_INVALID_TOKEN = 3003
-    AUTH_PERMISSION_DENIED = 3004
-    
-    # Slot Errors (4xxx)
-    SLOT_OVERFLOW = 4001
-    SLOT_NOT_FOUND = 4002
-    SLOT_LOCKED = 4003
-    
-    # Process Errors (5xxx)
-    PROCESS_SPAWN_FAILED = 5001
-    PROCESS_CRASH = 5002
-    PROCESS_TIMEOUT = 5003
-    
-    # Compile Errors (6xxx)
-    COMPILE_C_FAILED = 6001
-    COMPILE_RUST_FAILED = 6002
-    COMPILE_JAVA_FAILED = 6003
-    COMPILE_GO_FAILED = 6004
-    
-    # Parse Errors (7xxx)
-    PARSE_FILE_NOT_FOUND = 7001
-    PARSE_INVALID_BLOCK = 7002
-    PARSE_IMPORT_FAILED = 7003
-
-
 # Specific exception classes for common error types
 class MemoryError(QyroError):
     def __init__(self, code: ErrorCode = ErrorCode.MEMORY_NOT_FOUND, message: str = "Memory access error", **details):
@@ -220,5 +172,5 @@ class Result:
 
 
 # Qyro compatibility aliases
-QyroError = NexusError
+NexusError = QyroError
 QyroErrorCode = ErrorCode

@@ -1,15 +1,15 @@
 import json
-from .type_generator import NexusTypeGenerator
+from .type_generator import QyroTypeGenerator
 import os
 
-class NexusSchemaLoader:
+class QyroSchemaLoader:
     def __init__(self):
         pass
 
     def process_schema(self, schema_block: str, output_dir="nexus_generated"):
         try:
             schema = json.loads(schema_block)
-            generator = NexusTypeGenerator(schema)
+            generator = QyroTypeGenerator(schema)
             
             os.makedirs(output_dir, exist_ok=True)
             

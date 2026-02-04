@@ -15,16 +15,16 @@ from dataclasses import dataclass, field
 import colorama
 from colorama import Fore, Style
 
-from src.common.parser import QyroParser
-from src.common.compiler import QyroCompiler
-from src.common.schema_loader import QyroSchemaLoader
-from src.common.logging import get_logger
-from src.common.platform import get_platform
-from src.common.kafka_manager import KafkaManager
-from src.common.config import QyroConfig
-from src.common.redis_memory import RedisQyroMemory, RedisConnectionError
-from src.common.secure_sandbox import get_secure_sandbox
-from src.common.monitoring import get_monitor
+from qyro.common.parser import QyroParser
+from qyro.common.compiler import QyroCompiler
+from qyro.common.schema_loader import QyroSchemaLoader
+from qyro.common.logging import get_logger
+from qyro.common.platform import get_platform
+from qyro.common.kafka_manager import KafkaManager
+from qyro.common.config import QyroConfig
+from qyro.common.redis_memory import RedisQyroMemory, RedisConnectionError
+from qyro.common.secure_sandbox import get_secure_sandbox
+from qyro.common.monitoring import get_monitor
 
 # colorama.init() - Disabled to prevent interference with UTF-8 stdout wrapper
 if sys.platform == 'win32':
@@ -105,7 +105,7 @@ class QyroOrchestrator:
     def __init__(
         self,
         qyro_file: str,
-        config: NexusConfig,
+        config: QyroConfig,
         skip_missing: bool = True,
     ):
         self.qyro_file = qyro_file
@@ -1141,7 +1141,7 @@ class QyroOrchestrator:
                 "dependencies": {
                     "react": "^18.2.0",
                     "react-dom": "^18.2.0",
-                    "nexus-react": "file:../src/adapters/language_adapters/node_adapter",
+                    "nexus-react": "file:../qyro/adapters/language_adapters/node_adapter",
                     "lucide-react": "^0.300.0"
                 },
                 "devDependencies": {

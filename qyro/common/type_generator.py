@@ -1,7 +1,7 @@
 import json
 import ast
 
-class NexusTypeGenerator:
+class QyroTypeGenerator:
     def __init__(self, schema_json):
         self.schema = json.loads(schema_json) if isinstance(schema_json, str) else schema_json
 

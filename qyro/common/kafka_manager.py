@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 import logging
 
-from .config import NexusConfig
+from .config import QyroConfig
 from .logging import get_logger
 
 
@@ -30,7 +30,7 @@ class KafkaConfig:
 class KafkaManager:
     """Manages Kafka producers and consumers for Nexus modules."""
     
-    def __init__(self, config: NexusConfig):
+    def __init__(self, config: QyroConfig):
         self.config = config
         self.producer: Optional[AIOKafkaProducer] = None
         self.consumer: Optional[AIOKafkaConsumer] = None

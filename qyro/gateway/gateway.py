@@ -14,9 +14,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import uuid
 
-from src.common.kafka_manager import KafkaManager
-from src.common.config import QyroConfig
-from src.common.logging import get_logger
+from qyro.common.kafka_manager import KafkaManager
+from qyro.common.config import QyroConfig
+from qyro.common.logging import get_logger
 
 
 logger = get_logger("Qyro.gateway")
@@ -46,7 +46,7 @@ class QyroGateway:
             logger.warning("Kafka setup failed, will try Redis fallback")
 
         # Initialize Redis Memory
-        from src.common.redis_memory import RedisQyroMemory
+        from qyro.common.redis_memory import RedisQyroMemory
         self.redis_memory = None
         try:
             self.redis_memory = RedisQyroMemory(

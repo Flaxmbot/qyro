@@ -12,7 +12,6 @@ import re
 import time
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-import distutils.dir_util
 
 from .logging import get_logger
 from .errors import NexusError, ErrorCode
@@ -135,7 +134,7 @@ import hashlib
 import pickle
 from .validation import validate_input, InputValidator, ValidationError
 
-class NexusCompiler:
+class QyroCompiler:
     """
     Compiler for polyglot code blocks with security validation.
 
