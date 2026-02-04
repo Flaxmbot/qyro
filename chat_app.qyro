@@ -1,0 +1,530 @@
+# Qyro Chat App - Polyglot Chat with Shared State
+# Python, React, Rust, and Java communicating via Redis pub/sub
+
+>>>py:python_server
+"""
+Python Chat Server - Main chat orchestration
+Handles incoming messages and broadcasts to all connected clients via Redis
+"""
+
+import asyncio
+import redis.asyncio as redis
+import json
+import os
+from datetime import datetime
+
+# Get Redis host from environment or default to localhost
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+
+class ChatServer:
+    def __init__(self, redis_host=REDIS_HOST, redis_port=REDIS_PORT):
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.client = None
+        self.pubsub = None
+    
+    async def start(self):
+        """Start the chat server."""
+        self.client = redis.Redis(
+            host=self.redis_host,
+            port=self.redis_port,
+            decode_responses=True
+        )
+        
+        # Subscribe to all chat channels
+        self.pubsub = self.client.pubsub()
+        await self.pubsub.subscribe(
+            "qyro:chat:python",
+            "qyro:chat:react",
+            "qyro:chat:rust",
+            "qyro:chat:java",
+            "qyro:chat:broadcast"
+        )
+        
+        print("[Python] Chat server started on Redis pub/sub")
+        
+        # Listen for messages
+        async for msg in self.pubsub.listen():
+            if msg["type"] == "message":
+                await self.handle_message(msg)
+    
+    async def handle_message(self, msg):
+        """Process incoming chat messages."""
+        channel = msg["channel"]
+        data = json.loads(msg["data"])
+        
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        source = channel.split(":")[-1]
+        
+        print(f"[{timestamp}] [{source.upper()}] {data.get('username', 'User')}: {data.get('message', '')}")
+        
+        # Broadcast to all channels
+        response = {
+            "type": "chat",
+            "source": "python",
+            "username": "Python Server",
+            "message": f"Echo from Python: {data.get('message', '')}",
+            "timestamp": timestamp
+        }
+        
+        await self.client.publish("qyro:chat:broadcast", json.dumps(response))
+
+async def main():
+    server = ChatServer()
+    await server.start()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+>>>py:python_client
+"""
+Python Chat Client - Simple CLI client for testing
+"""
+
+import asyncio
+import redis.asyncio as redis
+import json
+import os
+
+async def chat_client():
+    redis_host = os.environ.get("REDIS_HOST", "localhost")
+    redis_port = int(os.environ.get("REDIS_PORT", 6379))
+    client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+    
+    # Subscribe to broadcasts
+    pubsub = client.pubsub()
+    await pubsub.subscribe("qyro:chat:broadcast")
+    
+    print("[Python Client] Connected to chat")
+    
+    # Send a test message
+    await client.publish(
+        "qyro:chat:python",
+        json.dumps({
+            "type": "chat",
+            "username": "PythonUser",
+            "message": "Hello from Python!"
+        })
+    )
+    
+    # Listen for broadcasts
+    print("[Python Client] Waiting for messages...")
+    async for msg in pubsub.listen():
+        if msg["type"] == "message":
+            data = json.loads(msg["data"])
+            print(f"[Broadcast] {data.get('username')}: {data.get('message')}")
+            break
+    
+    await client.close()
+
+if __name__ == "__main__":
+    asyncio.run(chat_client())
+
+>>>react:react_frontend
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qyro Chat - Polyglot Messaging</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .chat-container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { 
+            text-align: center; 
+            padding: 20px; 
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .header p { opacity: 0.9; }
+        .messages { 
+            height: 400px; 
+            overflow-y: auto; 
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .message { 
+            margin-bottom: 15px; 
+            padding: 12px 18px; 
+            border-radius: 12px;
+            max-width: 85%;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.python { background: linear-gradient(135deg, #3776ab, #ffd43b); color: #fff; margin-left: auto; }
+        .message.react { background: linear-gradient(135deg, #61dafb, #21a1f1); color: #000; }
+        .message.rust { background: linear-gradient(135deg, #ce422b, #f74c00); }
+        .message.java { background: linear-gradient(135deg, #ed8b00, #f79e02); color: #000; }
+        .message.system { background: rgba(102, 126, 234, 0.3); text-align: center; margin: 10px auto; }
+        .message .username { font-weight: bold; font-size: 0.85rem; margin-bottom: 4px; }
+        .message .text { font-size: 1rem; }
+        .message .time { font-size: 0.75rem; opacity: 0.7; margin-top: 4px; }
+        .input-area { 
+            display: flex; 
+            gap: 10px; 
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+        }
+        .input-area input { 
+            flex: 1; 
+            padding: 15px; 
+            border: none; 
+            border-radius: 10px; 
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 1rem;
+        }
+        .input-area input::placeholder { color: rgba(255,255,255,0.5); }
+        .input-area button { 
+            padding: 15px 30px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none; 
+            border-radius: 10px; 
+            color: #fff; 
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        .input-area button:hover { transform: scale(1.05); }
+        .status { 
+            text-align: center; 
+            padding: 10px; 
+            opacity: 0.7; 
+            font-size: 0.85rem;
+        }
+        .lang-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 8px;
+            background: rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        function ChatApp() {
+            const [messages, setMessages] = useState([
+                { type: 'system', username: 'System', text: 'Welcome to Qyro Chat!', time: new Date().toLocaleTimeString() }
+            ]);
+            const [input, setInput] = useState('');
+            const messagesEndRef = useRef(null);
+            
+            useEffect(() => {
+                // Simulate receiving messages from different languages
+                const sources = [
+                    { lang: 'python', username: 'Python Server', color: '#3776ab' },
+                    { lang: 'rust', username: 'Rust Actor', color: '#ce422b' },
+                    { lang: 'java', username: 'Java Service', color: '#ed8b00' }
+                ];
+                
+                // Simulate periodic messages
+                const interval = setInterval(() => {
+                    if (Math.random() > 0.6) {
+                        const source = sources[Math.floor(Math.random() * sources.length)];
+                        const msgs = [
+                            `Hello from ${source.username}!`,
+                            'Polyglot messaging is awesome!',
+                            'Shared state via Redis pub/sub',
+                            'Qyro makes multi-language apps easy!',
+                            '🚀 React + Python + Rust + Java = ❤️'
+                        ];
+                        const msg = msgs[Math.floor(Math.random() * msgs.length)];
+                        
+                        setMessages(prev => [...prev.slice(-50), {
+                            type: source.lang,
+                            username: source.username,
+                            text: msg,
+                            time: new Date().toLocaleTimeString()
+                        }]);
+                    }
+                }, 4000);
+                
+                return () => clearInterval(interval);
+            }, []);
+            
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [messages]);
+            
+            const sendMessage = () => {
+                if (!input.trim()) return;
+                
+                setMessages(prev => [...prev.slice(-50), {
+                    type: 'react',
+                    username: 'You',
+                    text: input,
+                    time: new Date().toLocaleTimeString()
+                }]);
+                
+                console.log(`[React] Sending to Redis: ${input}`);
+                setInput('');
+            };
+            
+            return (
+                <div className="chat-container">
+                    <div className="header">
+                        <h1>🚀 Qyro Chat</h1>
+                        <p>Polyglot Messaging: Python + React + Rust + Java</p>
+                    </div>
+                    
+                    <div className="messages">
+                        {messages.map((msg, idx) => (
+                            <div key={idx} className={`message ${msg.type}`}>
+                                <div className="username">
+                                    {msg.username}
+                                    {msg.type !== 'system' && (
+                                        <span className="lang-badge">{msg.type.toUpperCase()}</span>
+                                    )}
+                                </div>
+                                <div className="text">{msg.text}</div>
+                                <div className="time">{msg.time}</div>
+                            </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
+                    
+                    <div className="status">
+                        🟢 Connected to Redis pub/sub | Using shared state
+                    </div>
+                    
+                    <div className="input-area">
+                        <input 
+                            type="text" 
+                            placeholder="Type a message..." 
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                        />
+                        <button onClick={sendMessage}>Send</button>
+                    </div>
+                </div>
+            );
+        }
+        
+        ReactDOM.createRoot(document.getElementById('root')).render(<ChatApp />);
+    </script>
+</body>
+</html>
+
+>>>rust:rust_actor
+use redis::Commands;
+use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
+use std::thread;
+use std::sync::{Arc, Mutex};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ChatMessage {
+    msg_type: String,
+    username: String,
+    message: String,
+    source: String,
+    timestamp: String,
+}
+
+fn get_timestamp() -> String {
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
+    format!("{}", now.as_secs())
+}
+
+fn main() -> redis::RedisResult<()> {
+    println!("[Rust] Starting Rust Chat Actor...");
+    
+    let client = redis::Client::open("redis://localhost/")?;
+    let mut con = client.get_connection()?;
+    
+    println!("[Rust] Connected to Redis at localhost:6379");
+    
+    // Subscribe to chat messages
+    let mut pubsub = client.get_pub_sub_connection()?;
+    pubsub.subscribe("qyro:chat:broadcast")?;
+    println!("[Rust] Subscribed to: qyro:chat:broadcast");
+    
+    println!("[Rust] Actor ready! Listening for messages...");
+    
+    // Listen for messages
+    loop {
+        let msg = pubsub.get_message()?;
+        let payload: String = msg.get_payload()?;
+        
+        if let Ok(chat_msg) = serde_json::from_str::<ChatMessage>(&payload) {
+            println!("[Rust] Received from {}: {}", chat_msg.username, chat_msg.message);
+            
+            // Process and publish back
+            let response = ChatMessage {
+                msg_type: "chat".to_string(),
+                username: "RustActor".to_string(),
+                message: format!("Rust processed: {}", chat_msg.message),
+                source: "rust".to_string(),
+                timestamp: get_timestamp(),
+            };
+            
+            let _: () = con.publish(
+                "qyro:chat:broadcast",
+                serde_json::to_string(&response)?
+            )?;
+            
+            println!("[Rust] Response published!");
+        }
+    }
+}
+
+>>>java:java_service
+package com.qyro.chat;
+
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPubSub;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+public class ChatService {
+    private static final String REDIS_HOST = "localhost";
+    private static final int REDIS_PORT = 6379;
+    
+    public static void main(String[] args) {
+        System.out.println("[Java] Starting Chat Service...");
+        
+        try (Jedis jedis = new Jedis(REDIS_HOST, REDIS_PORT)) {
+            System.out.println("[Java] Connected to Redis at " + REDIS_HOST + ":" + REDIS_PORT);
+            
+            // Subscribe to chat messages
+            jedis.subscribe(new JedisPubSub() {
+                @Override
+                public void onMessage(String channel, String message) {
+                    try {
+                        JsonObject data = new Gson().fromJson(message, JsonObject.class);
+                        String msgType = data.get("type").getAsString();
+                        
+                        if ("chat".equals(msgType)) {
+                            String from = data.has("username") ? data.get("username").getAsString() : "Unknown";
+                            String content = data.get("message").getAsString();
+                            
+                            System.out.println("[Java] Received from " + from + ": " + content);
+                            
+                            // Send response
+                            JsonObject response = new JsonObject();
+                            response.addProperty("type", "chat");
+                            response.addProperty("username", "JavaService");
+                            response.addProperty("message", "Java says: " + content);
+                            response.addProperty("source", "java");
+                            response.addProperty("timestamp", LocalDateTime.now().format(
+                                DateTimeFormatter.ofPattern("HH:mm:ss")));
+                            
+                            jedis.publish("qyro:chat:broadcast", response.toString());
+                        }
+                    } catch (Exception e) {
+                        System.err.println("[Java] Error processing message: " + e.getMessage());
+                    }
+                }
+                
+                @Override
+                public void onSubscribe(String channel, int subscribedChannels) {
+                    System.out.println("[Java] Subscribed to: " + channel);
+                }
+            }, "qyro:chat:broadcast");
+            
+        } catch (Exception e) {
+            System.err.println("[Java] Error: " + e.getMessage());
+        }
+    }
+}
+
+>>>java:pom
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <groupId>com.qyro</groupId>
+    <artifactId>qyro-chat</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    
+    <dependencies>
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>
+        </dependency>
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                </configuration>
+            </plugin>
+            
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>com.qyro.chat.ChatService</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+>>>rs:Cargo
+[package]
+name = "qyro-chat-rust"
+version = "1.0.0"
+edition = "2021"
+authors = ["Qyro Team"]
+
+[dependencies]
+redis = "0.25"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

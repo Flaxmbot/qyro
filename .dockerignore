@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.pytest_cache
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/node_modules
+docs/.vite
+
+# Temporary files
+*.tmp
+*.log
+.qyro/
+QYRO_*/
+.tmp/
+
+# Cache
+.cache
+.ruff_cache
+.mypy_cache

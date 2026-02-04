@@ -113,10 +113,16 @@ class KafkaManager:
             raise
 
     def start(self):
+        """Initialize the Kafka manager. Async start must be called separately."""
+        self.running = True
+        logger.info("Kafka manager initialized (call start_async() to start producer)")
+
+    async def start_async(self):
         """Start the Kafka manager in a background task."""
         self.running = True
         # Start producer in background
-        asyncio.create_task(self._run_producer())
+        await self.start_producer()
+        logger.info("Kafka producer started")
 
     def stop(self):
         """Stop the Kafka manager."""

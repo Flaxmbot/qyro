@@ -12,9 +12,6 @@ import subprocess
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
-import colorama
-from colorama import Fore, Style
-
 from qyro.common.parser import QyroParser
 from qyro.common.compiler import QyroCompiler
 from qyro.common.schema_loader import QyroSchemaLoader
@@ -25,19 +22,23 @@ from qyro.common.config import QyroConfig
 from qyro.common.redis_memory import RedisQyroMemory, RedisConnectionError
 from qyro.common.secure_sandbox import get_secure_sandbox
 from qyro.common.monitoring import get_monitor
+import pyfiglet
+from rich import print as rprint
+from rich.panel import Panel
+from rich.text import Text
+from rich.style import Style as RichStyle
 
-# colorama.init() - Disabled to prevent interference with UTF-8 stdout wrapper
-if sys.platform == 'win32':
-    try:
-        from colorama import just_fix_windows_console
-        just_fix_windows_console()
-    except ImportError:
-        # Fallback for older colorama
-        colorama.init(strip=False, convert=False)
-else:
-    colorama.init()
 logger = get_logger("nexus.orchestrator")
 monitor = get_monitor()
+
+# Rich color tags for reuse
+CYAN = "[cyan]"
+YELLOW = "[yellow]"
+GREEN = "[green]"
+RED = "[red]"
+BOLD = "[bold]"
+RESET = "[/]"
+RESET_BOLD = "[/bold]"
 
 
 @dataclass
@@ -110,9 +111,9 @@ class QyroOrchestrator:
     ):
         self.qyro_file = qyro_file
         self.config = config
-        self.parser = QyroParser()()
+        self.parser = QyroParser()
         self.compiler = QyroCompiler(skip_missing=skip_missing)
-        self.schema_loader = QyroSchemaLoader()()
+        self.schema_loader = QyroSchemaLoader()
         self.platform = get_platform()
         self.running = True
         self.processes: List[ProcessInfo] = []
@@ -139,8 +140,8 @@ class QyroOrchestrator:
         self._print_banner()
 
         try:
-            logger.info(f"Parsing {self.QYRO_file}...")
-            self.parser.parse_file(self.QYRO_file)
+            logger.info(f"Parsing {self.qyro_file}...")
+            self.parser.parse_file(self.qyro_file)
 
             # Initialize Kafka manager
             self._initialize_kafka_manager()
@@ -207,7 +208,7 @@ class QyroOrchestrator:
     def _initialize_kafka_manager(self):
         """Initialize Kafka manager for messaging."""
         try:
-            print(f"{Fore.CYAN}[QYRO] Initializing Kafka at {self.config.kafka_bootstrap_servers}...{Style.RESET_ALL}")
+            print(f"{CYAN}[QYRO] Initializing Kafka at {self.config.kafka_bootstrap_servers}...{RESET}")
             self.kafka_manager = KafkaManager(self.config)
             
             # Start Kafka manager
@@ -225,7 +226,7 @@ class QyroOrchestrator:
     def _initialize_redis_memory(self):
         """Initialize Redis memory and set up event subscriptions."""
         try:
-            print(f"{Fore.CYAN}[QYRO] Connecting to Redis at {self.config.redis_host}:{self.config.redis_port}...{Style.RESET_ALL}")
+            print(f"{CYAN}[QYRO] Connecting to Redis at {self.config.redis_host}:{self.config.redis_port}...{RESET}")
             self.memory = RedisQyroMemory(
                 host=self.config.redis_host,
                 port=self.config.redis_port,
@@ -243,7 +244,7 @@ class QyroOrchestrator:
                     'pid': os.getpid(),
                     'metadata': {
                         'type': 'orchestrator',
-                        'QYRO_file': self.QYRO_file
+                        'QYRO_file': self.qyro_file
                     }
                 }
             )
@@ -325,19 +326,20 @@ class QyroOrchestrator:
                     continue
 
                 # Colorize output based on source
-                prefix_color = Fore.RED if is_stderr else Fore.CYAN
+                prefix_color = RED if is_stderr else CYAN
                 # Check for "Link:" or http/https URLs to highlight
                 if "Link:" in line or "http://" in line or "https://" in line:
                     # Highlight URL if present
                     if "http" in line:
                         import re
                         url_pattern = r'(https?://[^\s]+)'
-                        line = re.sub(url_pattern, f"{Fore.YELLOW}{Style.BRIGHT}\\1{Style.RESET_ALL}{prefix_color}", line)
+                        url_colored = YELLOW + BOLD + r'\1' + RESET + prefix_color
+                        line = re.sub(url_pattern, url_colored, line)
 
-                    self._safe_print(f"{prefix_color}[{name}] {line}{Style.RESET_ALL}")
-                    self._safe_print(f"{Fore.GREEN}{Style.BRIGHT}>>> ACCESS LINK ABOVE <<<{Style.RESET_ALL}")
+                    self._safe_print(f"{prefix_color}[{name}] {line}{RESET}")
+                    self._safe_print(f"{GREEN}{BOLD}>>> ACCESS LINK ABOVE <<<{RESET}")
                 else:
-                    self._safe_print(f"{prefix_color}[{name}] {line}{Style.RESET_ALL}")
+                    self._safe_print(f"{prefix_color}[{name}] {line}{RESET}")
 
         except ValueError:
             pass  # Pipe closed
@@ -413,18 +415,19 @@ class QyroOrchestrator:
                         name, is_stderr, line = output_queue.get(timeout=0.01)
                         if line:
                             # Colorize output based on source
-                            prefix_color = Fore.RED if is_stderr else Fore.CYAN
+                            prefix_color = RED if is_stderr else CYAN
                             # Check for "Link:" or http/https URLs to highlight
                             if "Link:" in line or "http://" in line or "https://" in line:
                                 if "http" in line:
                                     import re
                                     url_pattern = r'(https?://[^\s]+)'
-                                    line = re.sub(url_pattern, f"{Fore.YELLOW}{Style.BRIGHT}\\1{Style.RESET_ALL}{prefix_color}", line)
+                                    url_colored = YELLOW + BOLD + r'\1' + RESET + prefix_color
+                                    line = re.sub(url_pattern, url_colored, line)
 
-                                self._safe_print(f"{prefix_color}[{name}] {line}{Style.RESET_ALL}")
-                                self._safe_print(f"{Fore.GREEN}{Style.BRIGHT}>>> ACCESS LINK ABOVE <<<{Style.RESET_ALL}")
+                                self._safe_print(f"{prefix_color}[{name}] {line}{RESET}")
+                                self._safe_print(f"{GREEN}{BOLD}>>> ACCESS LINK ABOVE <<<{RESET}")
                             else:
-                                self._safe_print(f"{prefix_color}[{name}] {line}{Style.RESET_ALL}")
+                                self._safe_print(f"{prefix_color}[{name}] {line}{RESET}")
                     except queue.Empty:
                         continue
                 except Exception:
@@ -445,18 +448,19 @@ class QyroOrchestrator:
 
                                 if line:
                                     # Colorize output based on source
-                                    prefix_color = Fore.RED if is_stderr else Fore.CYAN
+                                    prefix_color = RED if is_stderr else CYAN
                                     # Check for "Link:" or http/https URLs to highlight
                                     if "Link:" in line or "http://" in line or "https://" in line:
                                         if "http" in line:
                                             import re
                                             url_pattern = r'(https?://[^\s]+)'
-                                            line = re.sub(url_pattern, f"{Fore.YELLOW}{Style.BRIGHT}\\1{Style.RESET_ALL}{prefix_color}", line)
+                                            url_colored = YELLOW + BOLD + r'\1' + RESET + prefix_color
+                                            line = re.sub(url_pattern, url_colored, line)
 
-                                        self._safe_print(f"{prefix_color}[{name}] {line}{Style.RESET_ALL}")
-                                        self._safe_print(f"{Fore.GREEN}{Style.BRIGHT}>>> ACCESS LINK ABOVE <<<{Style.RESET_ALL}")
+                                        self._safe_print(f"{prefix_color}[{name}] {line}{RESET}")
+                                        self._safe_print(f"{GREEN}{BOLD}>>> ACCESS LINK ABOVE <<<{RESET}")
                                     else:
-                                        self._safe_print(f"{prefix_color}[{name}] {line}{Style.RESET_ALL}")
+                                        self._safe_print(f"{prefix_color}[{name}] {line}{RESET}")
                             else:
                                 # EOF reached, remove pipe from monitoring
                                 if pipe in all_pipes:
@@ -1210,14 +1214,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             subprocess.run(["npm", "install"], cwd=cwd, shell=True)
 
     def _print_banner(self):
-        banner = r"""
-  _   _ ________   __  _______  _____
- | \ | |  ____\ \ / / |__   __||_   _|
- |  \| | |__   \ V /     | |     | |
- | . ` |  __|   > <      | |     | |
- | |\  | |____ / . \     | |    _| |_
- |_| \_|______/_/ \_\    |_|   |_____|
-        """
-        print(f"{Fore.GREEN}{banner}{Style.RESET_ALL}", flush=True)
-        print(f"{Fore.CYAN}  Polyglot Runtime v2.0 - NBP v3 Protocol{Style.RESET_ALL}", flush=True)
-        print(flush=True)
+        """Print a beautiful banner using pyfiglet and rich."""
+        ascii_banner = pyfiglet.figlet_format("QYRO", font="big")
+        banner_text = Text(ascii_banner, style="bold cyan")
+        
+        panel = Panel(
+            banner_text,
+            title="[bold green]Universal Polyglot Runtime[/bold green]",
+            subtitle="[italic white]NBP v3 Protocol - Write Python, React, Rust, Java in one file[/italic white]",
+            border_style="cyan",
+            expand=False,
+            padding=(1, 4)
+        )
+        rprint(panel)

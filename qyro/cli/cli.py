@@ -19,6 +19,7 @@ from rich.prompt import Prompt
 from rich import print as rprint
 from rich.table import Table
 from rich.tree import Tree
+import pyfiglet
 
 try:
     from qyro.orchestrator import QyroOrchestrator
@@ -40,25 +41,19 @@ console = Console()
 @click.version_option(version='2.0.0')
 def main():
     """Qyro - Universal Polyglot Runtime"""
-    # Display a beautiful header
-    header_text = r"""
-  _   _ ________   __  _______  _____
-  | \ | |  ____\ \ / / |__   __||_   _|
-  |  \| | |__   \ V /     | |     | |
-  | . ` |  __|   > <      | |     | |
-  | |\  | |____ / . \     | |    _| |_
-  |_| \_|______/_/ \_\    |_|   |_____|
-
-  Polyglot Runtime v2.0 - NBP v3 Protocol
- """
-    console.print(Panel(
-        Text(header_text, style="bold cyan", justify="center"),
-        title="[bold green]Qyro Runtime[/bold green]",
-        subtitle="[italic white]The Universal Compiler[/italic white]",
+    # Display a beautiful banner using pyfiglet and rich
+    ascii_banner = pyfiglet.figlet_format("QYRO", font="big")
+    banner_text = Text(ascii_banner, style="bold cyan")
+    
+    panel = Panel(
+        banner_text,
+        title="[bold green]Universal Polyglot Runtime[/bold green]",
+        subtitle="[italic white]Write Python, React, Rust, Java in one file with shared state[/italic white]",
         border_style="cyan",
-        expand=False
-    ))
-    pass
+        expand=False,
+        padding=(1, 4)
+    )
+    console.print(panel)
 
 
 @main.command()
@@ -95,34 +90,32 @@ def run(qyro_file: str, redis_host: str, redis_port: int, redis_password: Option
             debug=debug
         )
 
-        # Initialize Kafka manager
-        with console.status("[bold green]Initializing Kafka Manager...") as status:
-            kafka_manager = KafkaManager(config)
-            kafka_manager.start()
-            console.log("Kafka Manager initialized")
+        # Initialize Kafka manager (defer starting until async context)
+        kafka_manager = KafkaManager(config)
+        console.print("[green]Kafka Manager initialized (starting asynchronously)[/green]")
 
         # Create orchestrator with Kafka integration
-        with console.status("[bold green]Starting Qyro Orchestrator...") as status:
-            orchestrator = QyroOrchestrator(
-                qyro_file=qyro_file,
-                config=config,
-                skip_missing=skip_missing
-            )
-            console.log("Qyro Orchestrator started")
+        console.print("[bold green]Starting Qyro Orchestrator...[/bold green]")
+        orchestrator = QyroOrchestrator(
+            qyro_file=qyro_file,
+            config=config,
+            skip_missing=skip_missing
+        )
 
         # Start the orchestrator
         console.print("\n[bold green]🚀 Qyro application is now running![/bold green]")
+        console.print("[dim]Press Ctrl+C to stop[/dim]")
         orchestrator.start()
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Shutting down gracefully...[/yellow]")
         if 'orchestrator' in locals():
             orchestrator.shutdown()
-        if 'kafka_manager' in locals():
-            kafka_manager.stop()
         sys.exit(0)
     except Exception as e:
-        console.print(f"[red]Error: {e}[/red]", err=True)
+        console.print(f"[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
@@ -130,7 +123,7 @@ def run(qyro_file: str, redis_host: str, redis_port: int, redis_password: Option
 @click.argument('qyro_file', type=click.Path(exists=True))
 @click.option('--output-dir', default='./dist', help='Output directory for compiled artifacts')
 @click.option('--target', default='docker', type=click.Choice(['docker', 'binary', 'kubernetes']),
-              help='Target platform for compilation')
+              help='Target platform for deployment')
 def build(qyro_file: str, output_dir: str, target: str):
     """Build a Qyro application for deployment."""
     from qyro.common.builder import QyroBuilder
@@ -143,7 +136,7 @@ def build(qyro_file: str, output_dir: str, target: str):
         
         console.print(f"[bold green]✅ Build completed successfully in {output_dir}[/bold green]")
     except Exception as e:
-        console.print(f"[red]Build failed: {e}[/red]", err=True)
+        console.print(f"[red]Build failed: {e}[/red]")
         sys.exit(1)
 
 
@@ -175,7 +168,7 @@ def gateway(host: str, port: int, kafka_bootstrap_servers: str):
         console.print("\n[yellow]Shutting down gateway...[/yellow]")
         sys.exit(0)
     except Exception as e:
-        console.print(f"[red]Gateway error: {e}[/red]", err=True)
+        console.print(f"[red]Gateway error: {e}[/red]")
         sys.exit(1)
 
 
@@ -191,7 +184,21 @@ def version():
 @click.option('--detached/--foreground', default=True, help='Run in detached mode (background)')
 @click.option('--with-kafka/--without-kafka', default=False, help='Include Kafka in the setup')
 def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
-    """Automatically setup and run Qyro application in Docker."""
+    """
+    Automatically setup and run Qyro application in Docker.
+    
+    This command:
+    1. Starts Redis (and optionally Kafka) in Docker containers
+    2. Builds Docker images for your Qyro application
+    3. Runs all services together using Docker Compose
+    
+    Requirements:
+    - Docker and Docker Compose must be installed
+    - Your qyro_file must be accessible from Docker
+    
+    Example:
+        qyro setup my_app.qyro --with-kafka
+    """
     import subprocess
     import tempfile
     import yaml
@@ -202,11 +209,11 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
     try:
         result = subprocess.run(['docker', '--version'], capture_output=True, text=True)
         if result.returncode != 0:
-            console.print("[red]Error: Docker is not installed or not running.[/red]", err=True)
+            console.print("[red]Error: Docker is not installed or not running.[/red]")
             return
         console.print(f"[green]Docker version: {result.stdout.strip()}[/green]")
     except FileNotFoundError:
-        console.print("[red]Error: Docker is not installed or not in PATH.[/red]", err=True)
+        console.print("[red]Error: Docker is not installed or not in PATH.[/red]")
         return
 
     # Check if Docker Compose is available
@@ -216,18 +223,21 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
             # Try docker compose (newer versions)
             result = subprocess.run(['docker', 'compose', 'version'], capture_output=True, text=True)
             if result.returncode != 0:
-                console.print("[red]Error: Docker Compose is not installed or not running.[/red]", err=True)
+                console.print("[red]Error: Docker Compose is not installed or not running.[/red]")
                 return
         console.print("[green]Docker Compose is available[/green]")
     except FileNotFoundError:
-        console.print("[red]Error: Docker Compose is not installed or not in PATH.[/red]", err=True)
+        console.print("[red]Error: Docker Compose is not installed or not in PATH.[/red]")
         return
 
     # Determine the absolute path of the qyro file
     qyro_file_path = Path(qyro_file).resolve()
     qyro_file_name = qyro_file_path.name
     qyro_file_dir = qyro_file_path.parent
-
+    
+    # Get the Qyro project root (parent of qyro package)
+    qyro_cli_dir = Path(__file__).resolve().parent.parent.parent
+    
     # Create a temporary docker-compose file for this specific setup
     compose_config = {
         'version': '3.8',
@@ -236,6 +246,7 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
                 'image': 'redis:7-alpine',
                 'ports': ['6379:6379'],
                 'volumes': ['redis-data:/data'],
+                'networks': ['qyro-net'],
                 'command': 'redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru',
                 'healthcheck': {
                     'test': ['CMD', 'redis-cli', 'ping'],
@@ -284,14 +295,15 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
     # Add the orchestrator service
     compose_config['services']['orchestrator'] = {
         'build': {
-            'context': '.',
+            'context': str(qyro_cli_dir),
             'dockerfile': 'Dockerfile',
             'target': 'orchestrator'
         },
         'environment': [
             'REDIS_HOST=redis',
             'REDIS_PORT=6379',
-            f'QYRO_FILE={qyro_file_name}'
+            f'QYRO_FILE={qyro_file_name}',
+            f'QYRO_FILE_DIR=/qyro_files'
         ],
         'depends_on': {
             'redis': {
@@ -299,7 +311,7 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
             }
         },
         'volumes': [
-            f'{str(qyro_file_dir)}:/app',
+            f'{str(qyro_file_dir)}:/qyro_files',
             '/dev/shm:/dev/shm'
         ],
         'networks': ['qyro-net'],
@@ -309,7 +321,7 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
     # Add gateway service
     compose_config['services']['gateway'] = {
         'build': {
-            'context': '.',
+            'context': str(qyro_cli_dir),
             'dockerfile': 'Dockerfile',
             'target': 'gateway'
         },
@@ -324,7 +336,7 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
             }
         },
         'volumes': [
-            f'{str(qyro_file_dir)}:/app'
+            f'{str(qyro_file_dir)}:/qyro_files'
         ],
         'networks': ['qyro-net'],
         'restart': 'unless-stopped',
@@ -343,17 +355,13 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
         temp_compose_file = f.name
 
     try:
-        # Change to the directory containing the qyro file
-        original_dir = os.getcwd()
-        os.chdir(str(qyro_file_dir))
-
         # Build if requested
         if build:
             with console.status("[bold green]Building Docker images...") as status:
                 build_cmd = ['docker-compose', '-f', temp_compose_file, 'build']
                 result = subprocess.run(build_cmd)
                 if result.returncode != 0:
-                    console.print("[red]Error: Failed to build Docker images.[/red]", err=True)
+                    console.print("[red]Error: Failed to build Docker images.[/red]")
                     return
 
         # Run the services
@@ -366,7 +374,7 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
 
             result = subprocess.run(up_cmd)
             if result.returncode != 0:
-                console.print("[red]Error: Failed to start services.[/red]", err=True)
+                console.print("[red]Error: Failed to start services.[/red]")
                 return
 
         console.print(f"[bold green]🚀 Qyro application is now running![/bold green]")
@@ -377,8 +385,11 @@ def setup(qyro_file: str, build: bool, detached: bool, with_kafka: bool):
         console.print(f"Redis server running at: [blue]localhost:6379[/blue]")
 
     finally:
-        # Restore original directory
-        os.chdir(original_dir)
+        # Clean up temp file
+        try:
+            os.unlink(temp_compose_file)
+        except:
+            pass
 
 
 @main.command()

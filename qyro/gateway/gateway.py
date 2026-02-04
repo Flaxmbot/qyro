@@ -11,8 +11,10 @@ from typing import Dict, Any, Optional
 from typing import Dict, Any, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import uvicorn
 import uuid
+import os
 
 from qyro.common.kafka_manager import KafkaManager
 from qyro.common.config import QyroConfig
@@ -76,6 +78,41 @@ class QyroGateway:
         
         logger.info(f"Qyro Gateway initialized on {host}:{port}")
 
+    def _get_embedded_frontend(self) -> Optional[str]:
+        """Extract and return the embedded frontend HTML from the Qyro file."""
+        # Look for the Qyro file in common locations
+        qyro_files = [
+            "chat_app.qyro",
+            "app.qyro",
+            "/app/chat_app.qyro",
+            os.environ.get("QYRO_FILE", ""),
+        ]
+        
+        for qyro_file in qyro_files:
+            if not qyro_file:
+                continue
+            
+            if os.path.exists(qyro_file):
+                try:
+                    with open(qyro_file, 'r') as f:
+                        content = f.read()
+                    
+                    # Look for react_frontend block
+                    import re
+                    # Match >>>react:react_frontend followed by content until next >>>
+                    pattern = r">>>react:react_frontend\s*(.+?)(?=\n>>>|:|\Z)"
+                    match = re.search(pattern, content, re.DOTALL)
+                    if match:
+                        frontend_content = match.group(1).strip()
+                        # Return the full HTML if it starts with <!
+                        if frontend_content.startswith("<!"):
+                            logger.info(f"Found embedded frontend in {qyro_file}")
+                            return frontend_content
+                except Exception as e:
+                    logger.warning(f"Could not read Qyro file {qyro_file}: {e}")
+        
+        return None
+
     def _setup_middleware(self):
         """Setup FastAPI middleware."""
         self.app.add_middleware(
@@ -90,7 +127,19 @@ class QyroGateway:
         """Setup FastAPI routes."""
         @self.app.get("/")
         async def root():
+            # Try to serve the embedded frontend from the Qyro file
+            frontend_html = self._get_embedded_frontend()
+            if frontend_html:
+                return HTMLResponse(content=frontend_html)
             return {"message": "Qyro Gateway v2.0.0", "status": "running"}
+        
+        @self.app.get("/frontend")
+        async def frontend():
+            """Serve the embedded frontend HTML."""
+            frontend_html = self._get_embedded_frontend()
+            if frontend_html:
+                return HTMLResponse(content=frontend_html)
+            raise HTTPException(status_code=404, detail="No frontend found in Qyro file")
         
         @self.app.get("/health")
         async def health():
