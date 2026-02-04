@@ -46,32 +46,48 @@ The **Qyro Orchestrator** parses this file, compiles native code (C/Rust/Go) on 
 Qyro isn't just a runner; it's a complete operating environment.
 
 ```mermaid
-graph TB
-    subgraph "The Singularity (main.qyro)"
-        Src[Source Code] -->|Parser| Parse[Qyro Parser]
+graph TD
+    %% Styling
+    classDef core fill:#1e1e1e,stroke:#00d4ff,stroke-width:2px,color:#fff
+    classDef polyglot fill:#2d2d2d,stroke:#00ff9d,stroke-width:2px,color:#fff
+    classDef store fill:#1e1e1e,stroke:#ff00aa,stroke-width:2px,color:#fff
+    classDef stream fill:#1e1e1e,stroke:#fff,stroke-width:2px,color:#fff
+
+    subgraph Singularity["The Singularity (main.qyro)"]
+        direction TB
+        Src["Source Code"] -->|Parser| Parse["Qyro Parser"]
     end
 
-    Parse -->|Compiles| BinC[C/Rust/Go Binaries]
-    Parse -->|Prepares| ScriptPy[Python/TS Scripts]
+    Parse -->|Compiles| BinC["C/Rust/Go Binaries"]
+    Parse -->|Prepares| ScriptPy["Python/TS Scripts"]
 
-    subgraph "Runtime Environment"
-        Orch[Qyro Orchestrator] -->|Supervises| P1[Process 1 (Python)]
-        Orch -->|Supervises| P2[Process 2 (C/Rust)]
-        Orch -->|Supervises| P3[Process 3 (Node)]
+    subgraph Runtime["Runtime Environment"]
+        direction TB
+        Orch["Qyro Orchestrator"]
 
-        P1 <-->|Read/Write| Redis[(Redis Shared State)]
-        P2 <-->|Read/Write| Redis
-        P3 <-->|Read/Write| Redis
+        P1["Process 1 (Python)"]
+        P2["Process 2 (C/Rust)"]
+        P3["Process 3 (Node)"]
 
-        P1 <-->|Pub/Sub| Kafka{Kafka Event Bus}
-        P2 <-->|Pub/Sub| Kafka
+        Orch -->|Supervises| P1
+        Orch -->|Supervises| P2
+        Orch -->|Supervises| P3
 
-        GW[API Gateway] <-->|WS/HTTP| P1
+        GW["API Gateway"] <-->|WS/HTTP| P1
     end
 
-    style Orch fill:#f9f,stroke:#333,stroke-width:2px
-    style Redis fill:#d50000,stroke:#333,stroke-width:2px,color:white
-    style Kafka fill:#000,stroke:#333,stroke-width:2px,color:white
+    P1 <-->|Read/Write| Redis[("Redis Shared State")]
+    P2 <-->|Read/Write| Redis
+    P3 <-->|Read/Write| Redis
+
+    P1 <-->|Pub/Sub| Kafka{"Kafka Event Bus"}
+    P2 <-->|Pub/Sub| Kafka
+
+    %% Apply styles
+    class Src,Parse,Orch,GW core
+    class P1,P2,P3,BinC,ScriptPy polyglot
+    class Redis store
+    class Kafka stream
 ```
 
 ---
