@@ -1,0 +1,75 @@
+# Update .gitignore with comprehensive patterns
+
+# ===== Build artifacts =====
+*.class
+*.exe
+*.o
+*.so
+*.dll
+*.pyc
+*.pyo
+__pycache__/
+*.egg-info/
+dist/
+build/
+*.whl
+
+# ===== Qyro runtime =====
+qyro.mem
+*.mem
+.qyro_data/
+.qyro_plugins/
+qyro_build/
+qyro_generated/
+qyro_rust_project_*/
+qyro_module_*.py
+qyro_module_*.c
+qyro_module_*.rs
+qyro_module_*.java
+qyro_web_*.py
+QyroModule_*.java
+QyroModule_*.class
+*.lock
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Python =====
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+*.egg
+.eggs/
+
+# ===== Node.js =====
+node_modules/
+npm-debug.log
+yarn-error.log
+.npm/
+
+# ===== Rust =====
+target/
+Cargo.lock
+
+# ===== Logs =====
+*.log
+logs/
+
+#-----docs site----
+qyro-ver1.1.0/
+
+.qyro/
