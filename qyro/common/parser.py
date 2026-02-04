@@ -16,6 +16,7 @@ class NexusParser:
             'react': [],
             'nextjs': [],
         }
+        self.named_blocks = {}
 
     def parse_file(self, filepath: str):
         try:
@@ -39,25 +40,32 @@ class NexusParser:
             print(f"[QYRO] Importing {full_path}...")
             self.parse_file(full_path)
 
-        # Split by block markers: >>>py, >>>c, >>>java, etc.
-        parts = re.split(r'(?m)^>>>(\S+)\s*$', content)
+        # Split by block markers: >>>HEADER
+        # Captures the entire header line after >>>
+        parts = re.split(r'(?m)^>>>((?:(?!\n).)*)$', content)
         
         if len(parts) < 2:
             return 
             
         for i in range(1, len(parts), 2):
-            raw_type = parts[i].strip()
+            header = parts[i].strip()
             block_content = parts[i+1].strip()
             
-            # Handle type:name syntax (e.g. py:server -> type=py, name=server)
-            block_name = f"module_{i}"
-            if ':' in raw_type:
-                parts_type = raw_type.split(':', 1)
-                block_type = parts_type[0].lower()
-                block_name = parts_type[1]
-            else:
-                block_type = raw_type.lower()
+            # Parse header: type:name [deps]
+            # Regex: TYPE (:NAME)? (\s* [DEPS])?
+            header_match = re.match(r'^([^:\s]+)(?::([^:\s\[]+))?\s*(?:\[(.*?)\])?', header)
             
+            if not header_match:
+                # Fallback for simple cases if regex fails (unlikely)
+                block_type = header.lower()
+                block_name = f"module_{i}"
+                deps = []
+            else:
+                block_type = header_match.group(1).lower()
+                block_name = header_match.group(2) if header_match.group(2) else f"module_{i}"
+                deps_str = header_match.group(3)
+                deps = [d.strip() for d in deps_str.split(',')] if deps_str else []
+
             if block_type == 'import': 
                 continue
 
@@ -67,16 +75,14 @@ class NexusParser:
             self.blocks[block_type].append(block_content)
             
             # Store in unified named blocks list (For Build System)
-            if not hasattr(self, 'named_blocks'):
-                 self.named_blocks = {}
-            
             if block_type not in self.named_blocks:
                 self.named_blocks[block_type] = []
             
             self.named_blocks[block_type].append({
                 "name": block_name,
                 "content": block_content,
-                "original_type": raw_type
+                "original_type": header,
+                "dependencies": deps
             })
 
     def get_blocks(self, block_type: str):
