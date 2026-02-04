@@ -98,11 +98,11 @@ full = [
 qyro = "qyro.cli.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/qyro-dev/qyro"
-Documentation = "https://qyro.dev/docs"
-Repository = "https://github.com/qyro-dev/qyro"
-Changelog = "https://github.com/qyro-dev/qyro/releases"
-"Bug Tracker" = "https://github.com/qyro-dev/qyro/issues"
+Homepage = "https://github.com/Flaxmbot/qyro"
+Documentation = "https://github.com/Flaxmbot/qyro/wiki"
+Repository = "https://github.com/Flaxmbot/qyro"
+Changelog = "https://github.com/Flaxmbot/qyro/releases"
+"Bug Tracker" = "https://github.com/Flaxmbot/qyro/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
