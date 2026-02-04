@@ -1,360 +1,214 @@
 <div align="center">
 
-# <span style="font-family: 'Courier New', monospace;">██████╗ ██╗   ██╗ ██████╗ ███████╗████████╗███████╗</span>
-# <span style="font-family: 'Courier New', monospace;">██╔══██╗╚██╗ ██╔╝██╔═══██╗██╔════╝╚══██╔══╝██╔════╝</span>
-# <span style="font-family: 'Courier New', monospace;">██████╔╝ ╚████╔╝ ██║   ██║███████╗   ██║   █████╗  </span>
-# <span style="font-family: 'Courier New', monospace;">██╔══██╗  ╚██╔╝  ██║   ██║╚════██║   ██║   ██╔══╝  </span>
-# <span style="font-family: 'Courier New', monospace;">██████╔╝   ██║   ╚██████╔╝███████║   ██║   ███████╗</span>
-# <span style="font-family: 'Courier New', monospace;">╚═════╝    ╚═╝    ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝</span>
+```text
+   ____  __  __ ____   ____ 
+  / __ \ \ \/ // __ \ / __ \
+ / / / /  \  // /_/ // / / /
+/ /_/ /   / // _, _// /_/ / 
+\___\_\  /_//_/ |_| \____/  
+```
 
-### The Universal Polyglot Runtime
-**Write Python, C, Rust, Java in one file with shared state and modern microservices architecture**
+# Q Y R O
 
-[![PyPI version](https://badge.fury.io/py/qyro.svg)](https://badge.fury.io/py/qyro)
-[![Downloads](https://pepy.tech/badge/qyro)](https://pepy.tech/project/qyro)
-[![License](https://img.shields.io/github/license/qyro-dev/qyro)](https://github.com/qyro-dev/qyro/blob/main/LICENSE)
-[![Python Versions](https://img.shields.io/pypi/pyversions/qyro.svg)](https://pypi.org/project/qyro/)
-[![Status](https://img.shields.io/pypi/status/qyro.svg)](https://pypi.org/project/qyro/)
+**The Universal Polyglot Runtime**
+
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg?style=for-the-badge&color=00d4ff)](https://qyro.dev)
+[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge&color=00ff9d)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.8+-yellow.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Redis](https://img.shields.io/badge/redis-enabled-red.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![Kafka](https://img.shields.io/badge/kafka-enabled-black.svg?style=for-the-badge&logo=apachekafka&logoColor=white)](https://kafka.apache.org)
+
+<br/>
+
+> **The Singularity for Code.**
+> Write **Python, C, Rust, Go, Java, and TypeScript** in a *SINGLE* file.
+> Orchestrate them with **Shared State (Redis)** and **Event Streams (Kafka)**.
+
+[Getting Started](#getting-started) • [Features](#features) • [Architecture](#architecture) • [Example](#example) • [Documentation](#documentation)
 
 </div>
 
 ---
 
-## 🎯 **Animation Showcase**
+## ⚡ What is Qyro?
 
-<div align="center">
-  
+**Qyro** (formerly Nexus) is a revolutionary runtime that breaks down language barriers. It allows you to define an entire distributed system—backend logic, high-performance kernels, and frontend UI—in a single `.qyro` file.
+
+The **Orchestrator** parses this file, compiles native code (C/Rust/Go) on the fly, launches microservices, and connects them via a high-speed **Shared Memory Event Bus**.
+
+### 🔥 Why Qyro?
+
+*   **No Boilerplate**: Forget `Dockerfile`, `Makefile`, and complex build scripts.
+*   **Unified State**: Access shared variables across Python and C as if they were in the same process.
+*   **Industrial Strength**: Built on **Redis** for state persistence and **Kafka** for reliable messaging.
+*   **Self-Healing**: Automatic process supervision with exponential backoff and crash recovery.
+
+---
+
+## 🚀 Architecture
+
+Qyro isn't just a runner; it's a complete operating environment for polyglot applications.
+
+```mermaid
+graph TD
+    subgraph "The Singularity (main.qyro)"
+        Src[Source Code] -->|Parser| Parse[Qyro Parser]
+    end
+
+    Parse -->|Compiles| BinC[C/Rust/Go Binaries]
+    Parse -->|Prepares| ScriptPy[Python/TS Scripts]
+    
+    subgraph "Runtime Environment"
+        Orch[Qyro Orchestrator] -->|Supervises| P1[Process 1 (Python)]
+        Orch -->|Supervises| P2[Process 2 (C/Rust)]
+        Orch -->|Supervises| P3[Process 3 (Node)]
+        
+        P1 <-->|Read/Write| Redis[(Redis Shared State)]
+        P2 <-->|Read/Write| Redis
+        P3 <-->|Read/Write| Redis
+        
+        P1 <-->|Pub/Sub| Kafka{Kafka Event Bus}
+        P2 <-->|Pub/Sub| Kafka
+        
+        GW[API Gateway] <-->|WS/HTTP| P1
+    end
+    
+    style Orch fill:#f9f,stroke:#333,stroke-width:2px
+    style Redis fill:#d50000,stroke:#333,stroke-width:2px,color:white
+    style Kafka fill:#000,stroke:#333,stroke-width:2px,color:white
+```
+
+---
+
+## 💻 Example
+
+Imagine a high-performance system where Python handles business logic while C handles raw computation, all synchronized instantly.
+
+**`system.qyro`**
 ```python
-import qyro
-from rich.console import Console
-from rich.text import Text
-from rich.panel import Panel
-from rich.spinner import Spinner
-from rich.live import Live
-import time
+>>>schema:global
+# Shared memory definitions
+current_load: int
+system_status: string
 
-console = Console()
-
-# Animated Header
-ascii_art = r"""
-  _   _ ________   __  _______  _____
-  | \ | |  ____\ \ / / |__   __||_   _|
-  |  \| | |__   \ V /     | |     | |
-  | . ` |  __|   > <      | |     | |
-  | |\  | |____ / . \     | |    _| |_
-  |_| \_|______/_/ \_\    |_|   |_____|
-
-  Polyglot Runtime v2.0 - NBP v3 Protocol
-"""
-
-header_text = Text(ascii_art, style="bold cyan")
-subtitle = Text("\nPolyglot Runtime v2.0 - NBP v3 Protocol", style="bold magenta")
-console.print(header_text, end="")
-console.print(subtitle)
-
-# Animated Loading
-spinner = Spinner("clock", style="cyan")
-text = Text("Initializing The Singularity", style="bold yellow")
-panel = Panel(spinner, title=text, border_style="yellow")
-
-with Live(panel, refresh_per_second=20):
-    time.sleep(2)  # Simulate initialization
-
-console.print("[bold green]Singularity Active![/bold green]")
-```
-
-</div>
-
----
-
-## ✨ **Features**
-
-<div align="center">
-
-| Feature | Description |
-|--------|-------------|
-| 🐍 **Polyglot Programming** | Write Python, C, Rust, Java, Go, JavaScript, TypeScript, and React in a single file |
-| 🔄 **Shared State** | Real-time state sharing between different language modules |
-| 📡 **Modern Messaging** | Built-in Kafka integration for reliable message passing |
-| 🏗️ **Microservices Architecture** | Container-native design with service discovery |
-| 🔌 **Language Adapters** | Seamless integration between different programming languages |
-| 🔄 **Hot Reloading** | Automatic reloading during development |
-| 🚀 **Production Ready** | Designed for scalability and reliability |
-| 🌐 **API Gateway** | Unified interface with WebSocket support |
-| 📊 **Monitoring** | Built-in metrics and health checks |
-| 🌍 **Web Integration** | Full support for web technologies (HTML, CSS, JS, React) |
-
-</div>
-
----
-
-## 🚀 **Quick Start**
-
-### Installation
-
-```bash
-pip install qyro
-```
-
-### Basic Usage
-
-Create a `.qyro` file:
-
-```qyro
->>>schema
-{
-    "player_x": 0,
-    "player_y": 0,
-    "score": 0,
-    "game_over": false,
-    "message": "Hello Qyro"
-}
-
->>>py
-import time
-from qyro.adapters import QyroMemory
-import json
-
-mem = QyroMemory()
-while True:
-    data = mem.read()
-    print(f"Python module sees state: {data}")
-    time.sleep(1)
-
->>>c
-#include "qyro.h"
+>>>c:kernel
 #include <stdio.h>
-
+#include <stdlib.h>
+// The C module calculates heavy loads
 int main() {
-    printf("C module starting...\n");
-
-    // Initialize connection
-    if (qyro_init() != QYRO_OK) {
-        printf("Failed to initialize\n");
-        return 1;
-    }
-
-    // Read state
-    char* state = qyro_read_state();
-    printf("C module read: %s\n", state);
-    free(state);
-
-    // Update state
-    qyro_write_field("c_counter", "100");
-
-    qyro_cleanup();
+    printf("KERNEL: logic circuit active\n");
+    // Pseudo-code for shared memory access
+    // set_shared_int("current_load", 99);
     return 0;
 }
 
->>>rs
-use qyro_adapter::Qyro;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut qyro = Qyro::new();
-    qyro.connect().await?;
-
-    loop {
-        let state = qyro.read_state().await?;
-        println!("Rust module sees state: {:?}", state);
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    }
-}
-```
-
-### Run Your Application
-
-```bash
-qyro run main.qyro
-```
-
----
-
-## 🛠️ **Advanced Usage**
-
-### Using the Qyro Runtime Programmatically
-
-```python
-from qyro.orchestrator.orchestrator import QyroOrchestrator
-from qyro.common.config import QyroConfig
-
-# Create configuration
-config = QyroConfig(
-    redis_host="localhost",
-    redis_port=6379,
-    kafka_bootstrap_services="localhost:9092"
-)
-
-# Create orchestrator
-orchestrator = QyroOrchestrator(
-    qyro_file="main.qyro",
-    config=config
-)
-
-# Start the orchestrator
-orchestrator.start()
-```
-
-### Animation in Your Applications
-
-```python
-from rich.console import Console
-from rich.text import Text
-from rich.panel import Panel
-from rich.spinner import Spinner
-from rich.live import Live
+>>>py:brain
 import time
+from qyro.lib import shared_memory
 
-console = Console()
+def main():
+    print("BRAIN: Monitoring system...")
+    while True:
+        # Read from the C kernel instantly
+        load = shared_memory.get("current_load")
+        print(f"BRAIN: Current load is {load}%")
+        time.sleep(1)
 
-# Create animated elements
-def show_loading(message="Processing"):
-    spinner = Spinner("dots", style="green")
-    text = Text(message, style="bold blue")
-    panel = Panel(spinner, title=text, border_style="blue")
-    
-    with Live(panel, refresh_per_second=20):
-        time.sleep(3)  # Simulate work
-    
-    console.print("[bold green]Done![/bold green]")
-
-show_loading("Running Qyro Module...")
+if __name__ == "__main__":
+    main()
 ```
 
 ---
 
-## 📦 **Supported Languages**
+## 🌟 Features
 
-<div align="center">
+### 🏳️‍🌈 True Polyglot Support
+Support for a wide ecosystem of languages out of the box:
+*   **Python**: Full support for data science and general logic.
+*   **C / C++**: For high-performance system-level modules.
+*   **Rust**: Memory-safe, blazing fast components.
+*   **Go**: Concurrent networking services.
+*   **Java**: Enterprise integration.
+*   **TypeScript / Node.js**: Modern JavaScript operations.
+*   **Web (React/Next.js)**: Full frontend framework integration.
 
-| Language | Status | Adapter |
-|----------|--------|---------|
-| Python 🐍 | ✅ Stable | `qyro.adapters.python` |
-| C/C++ 🖥️ | ✅ Stable | `qyro.adapters.c` |
-| Rust 🦀 | ✅ Stable | `qyro.adapters.rust` |
-| Java ☕ | ✅ Stable | `qyro.adapters.java` |
-| Go 🐹 | ⚡ Beta | `qyro.adapters.go` |
-| JavaScript 🟨 | ⚡ Beta | `qyro.adapters.javascript` |
-| TypeScript 🔵 | ⚡ Beta | `qyro.adapters.typescript` |
-| React ⚛️ | ⚡ Beta | `qyro.adapters.react` |
+### 🧠 Shared Memory Intelligence
+*   **Zero-Latency Sharing**: Processes share data via Redis with local caching optimizations.
+*   **Atomic Operations**: Safe headers for concurrent access.
+*   **Persisted & Ephemeral**: Choose between in-memory speed or disk persistence.
 
-</div>
-
----
-
-## 📚 **API Reference**
-
-### Gateway API Endpoints
-
-- `GET /` - Root endpoint
-- `GET /health` - Health check
-- `GET /ready` - Readiness check
-- `GET /state` - Get current application state
-- `POST /state` - Update application state
-- `WS /ws` - WebSocket endpoint for real-time communication
-
-### Language Adapter API
-
-Each language has its own adapter with consistent APIs:
-
-#### Python
-```python
-from qyro.adapters.language_adapters.python.python_adapter import QyroModule
-
-qyro = QyroModule("python_module")
-qyro.connect()
-
-state = qyro.read_state()  # Read all state
-qyro.write_state({"key": "value"})  # Update multiple fields
-qyro.update_field("key", "value")  # Update specific field
-
-qyro.disconnect()
-```
+### 📡 Event-Driven Backbone
+*   **Kafka Integration**: Production-grade message streaming built-in.
+*   **Redis Pub/Sub**: Lightweight real-time signaling.
+*   **Broadcast API**: Send signals to all running modules simultaneously.
 
 ---
 
-## 🧪 **Examples**
+## 🛠️ Getting Started
 
-### Simple Counter Application
+### Prerequisites
+*   **Python 3.8+**
+*   **Redis 5.0+**
+*   **Kafka 2.0+** (Optional, falls back to Redis)
+*   **Docker** (Optional, for containerized runs)
 
-```qyro
->>>schema
-{
-    "counter": 0,
-    "last_updated": ""
-}
-
->>>py
-import time
-from qyro.adapters import QyroMemory
-import datetime
-
-mem = QyroMemory()
-while True:
-    data = mem.read()
-    counter = data.get("counter", 0)
-    new_counter = counter + 1
-    
-    update = {
-        "counter": new_counter,
-        "last_updated": str(datetime.datetime.now())
-    }
-    
-    mem.write(update)
-    print(f"Counter updated to: {new_counter}")
-    time.sleep(2)
-```
-
-### Animation Example
-
-```python
-from qyro.common.animation import AnimatedConsole
-from rich.text import Text
-
-console = AnimatedConsole()
-
-# Animated header
-console.animate_ascii("QYRO", font="slant", style="bold cyan")
-console.print(Text("Universal Polyglot Runtime", style="bold magenta"))
-
-# Animated progress
-console.animate_progress("Initializing modules", 5)
-```
-
----
-
-## 🤝 **Contributing**
-
-We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md).
-
-### Development Setup
+### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/qyro-dev/qyro.git
 cd qyro
 
-# Install in development mode
-pip install -e ".[dev]"
-
-# Run tests
-pytest
+# Install dependencies
+pip install -r requirements.txt
 ```
+
+### Running Your First App
+
+1.  **Start Infrastructure** (if not already running):
+    ```bash
+    docker-compose up -d redis kafka
+    ```
+
+2.  **Run the runtime**:
+    ```bash
+    python run.py examples/nexus_chat/main.nexus
+    ```
+
+    *Or run your own file:*
+    ```bash
+    python run.py my_app.qyro
+    ```
 
 ---
 
-## 📄 **License**
+## 📦 Directory Structure
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+*   📂 **`qyro/`**: The Core Package
+    *   📂 **`orchestrator/`**: Process supervision and lifecycle management.
+    *   📂 **`adapters/`**: Language-specific compilers and runners.
+    *   📂 **`common/`**: Shared libraries, config, and parsing logic.
+    *   📂 **`gateway/`**: API Gateway for external access.
+    *   📂 **`cli/`**: Command Line Interface tools.
+
+---
+
+## 🤝 Contributing
+
+We welcome all contributions to the Singularity!
+
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
 
 ---
 
 <div align="center">
 
-### Made with ❤️ for developers who love to code in multiple languages
+**Built with ❤️ by the Qyro Team**
 
-[![GitHub stars](https://img.shields.io/github/stars/qyro-dev/qyro?style=social)](https://github.com/qyro-dev/qyro)
-[![Twitter Follow](https://img.shields.io/twitter/follow/qyro_dev?style=social)](https://twitter.com/qyro_dev)
+*Code simpler. Build faster. Scale infinitely.*
 
 </div>
