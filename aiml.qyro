@@ -1,0 +1,36 @@
+>>>python:model [scikit-learn]
+from qyro.lib import qyro
+import time
+
+print("[Model] Loading AI Model...")
+time.sleep(2)
+print("[Model] Ready.")
+
+@qyro.on("ingest_data")
+def predict(data):
+    print(f"[Model] Predicting for {data}...")
+    time.sleep(0.5)
+    qyro.emit("prediction_ready", {"input": data, "prediction": "anomaly_detected"})
+
+qyro.start()
+
+>>>python:ingest
+from qyro.lib import qyro
+import time
+
+print("[Ingest] Service Started")
+while True:
+    time.sleep(5)
+    print("[Ingest] Emitting sensor data...")
+    qyro.emit("ingest_data", {"sensor_id": "cam_01", "timestamp": time.time()})
+
+>>>python:analytics
+from qyro.lib import qyro
+
+print("[Analytics] Service Started")
+
+@qyro.on("prediction_ready")
+def analyze(data):
+    print(f"[Analytics] Received prediction: {data['prediction']}")
+
+qyro.start()
