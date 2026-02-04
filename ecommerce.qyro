@@ -1,63 +1,55 @@
 >>>python:api [fastapi, uvicorn, requests]
 from fastapi import FastAPI
 from qyro.lib import qyro
-import time
-import threading
+import uuid
 
 app = FastAPI()
 
-@app.get("/")
-def home():
-    return {"message": "Ecommerce API Ready"}
-
-@app.post("/order")
-def create_order(item_id: str):
-    print(f"[API] Received order for {item_id}")
-    qyro.emit("order_created", {"item_id": item_id, "user": "user123"})
-    return {"status": "order_pending", "item_id": item_id}
-
-# Listen for payment completion
-@qyro.on("payment_processed")
-def on_payment(data):
-    print(f"[API] Order complete for {data.get('item_id')}!")
-
-# Start listener in background
-threading.Thread(target=qyro.start, daemon=True).start()
+@app.post("/checkout")
+def checkout(cart_id: str):
+    order_id = str(uuid.uuid4())
+    print(f"[API] Checkout started for {cart_id} -> Order {order_id}")
+    qyro.emit("order_created", {"order_id": order_id, "cart_id": cart_id})
+    return {"order_id": order_id, "status": "processing"}
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
->>>python:inventory
-from qyro.lib import qyro
-import time
+>>>rust:inventory [serde, serde_json]
+use qyro;
 
-print("[Inventory] Service Started")
+#[tokio::main]
+async fn main() {
+    println!("[Rust] Inventory Manager High-Performance Engine Started");
+    let q = qyro::Qyro::new().await;
+    // Logic to reserve inventory
+    loop { tokio::time::sleep(tokio::time::Duration::from_secs(5)).await; }
+}
 
-@qyro.on("order_created")
-def check_inventory(data):
-    item_id = data.get("item_id")
-    print(f"[Inventory] Checking stock for {item_id}...")
-    time.sleep(1) # Simulate DB
+>>>java:billing
+public class BillingService {
+    public static void main(String[] args) {
+        System.out.println("[Java] Billing Service Listening...");
+        // Logic to process payment
+    }
+}
 
-    # Reserve stock
-    print(f"[Inventory] Stock reserved for {item_id}")
-    qyro.emit("inventory_reserved", data)
+>>>react:storefront
+import React from 'react';
+import { useQyro } from 'qyro-client';
 
-qyro.start()
-
->>>node:payment
-const qyro = require('qyro');
-
-console.log("[Payment] Service Started");
-
-qyro.on("inventory_reserved", (data) => {
-    console.log(`[Payment] Processing payment for item ${data.item_id}...`);
-
-    setTimeout(() => {
-        console.log(`[Payment] Payment successful for ${data.item_id}`);
-        qyro.emit("payment_processed", { ...data, status: "paid" });
-    }, 2000);
-});
-
-qyro.start();
+export default function Storefront() {
+    const { emit } = useQyro();
+    return (
+        <div className="p-10">
+            <h1 className="text-3xl">Qyro Shop</h1>
+            <div className="card">
+                <h2>Cool Widget</h2>
+                <button onClick={() => emit('add_to_cart', { id: 'widget-1' })}>
+                    Add to Cart
+                </button>
+            </div>
+        </div>
+    );
+}
