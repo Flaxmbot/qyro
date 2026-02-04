@@ -1,112 +1,36 @@
->>>python:model_service [scikit-learn, pandas, numpy]
+>>>python:model [scikit-learn]
 from qyro.lib import qyro
-import pandas as pd
-import numpy as np
-from sklearn.linear_model import LinearRegression
 import time
 
-print("[Model] Training initial model...")
-# Dummy training
-X = np.array([[1, 1], [1, 2], [2, 2], [2, 3]])
-y = np.dot(X, np.array([1, 2])) + 3
-reg = LinearRegression().fit(X, y)
-print("[Model] Model trained.")
+print("[Model] Loading AI Model...")
+time.sleep(2)
+print("[Model] Ready.")
 
-@qyro.on("features_extracted")
+@qyro.on("ingest_data")
 def predict(data):
-    features = data.get("features")
-    req_id = data.get("id")
-    print(f"[Model] Predicting for ID: {req_id}")
-
-    # Use pandas just to show usage
-    df = pd.DataFrame([features], columns=['f1', 'f2'])
-    prediction = reg.predict(df)[0]
-
-    qyro.emit("prediction_ready", {
-        "id": req_id,
-        "prediction": prediction,
-        "timestamp": time.time()
-    })
+    print(f"[Model] Predicting for {data}...")
+    time.sleep(0.5)
+    qyro.emit("prediction_ready", {"input": data, "prediction": "anomaly_detected"})
 
 qyro.start()
 
->>>rust:feature_extractor [serde, serde_json]
-use qyro;
-use serde::{Deserialize, Serialize};
+>>>python:ingest
+from qyro.lib import qyro
+import time
 
-#[derive(Serialize, Deserialize, Debug)]
-struct RawData {
-    id: String,
-    raw_values: Vec<f64>
-}
+print("[Ingest] Service Started")
+while True:
+    time.sleep(5)
+    print("[Ingest] Emitting sensor data...")
+    qyro.emit("ingest_data", {"sensor_id": "cam_01", "timestamp": time.time()})
 
-#[derive(Serialize, Deserialize, Debug)]
-struct FeatureData {
-    id: String,
-    features: Vec<f64>
-}
+>>>python:analytics
+from qyro.lib import qyro
 
-#[tokio::main]
-async fn main() {
-    println!("[Rust] Feature Extractor Ready");
-    let q = qyro::Qyro::new().await;
+print("[Analytics] Service Started")
 
-    // Simulate listening loop (in real adapter we'd have a callback or stream)
-    // For this demo, we assume the adapter handles the loop internally via C FFI or similar if blocking
-    // But our rust adapter uses a loop in main usually.
-    // We'll mock the behavior here matching the adapter implementation.
+@qyro.on("prediction_ready")
+def analyze(data):
+    print(f"[Analytics] Received prediction: {data['prediction']}")
 
-    // NOTE: In the Rust adapter implementation `qyro::Qyro` doesn't expose a blocking listener yet
-    // in the simplified version we wrote. We implemented `emit`.
-    // Let's assume we update the Rust adapter to support `on` or polling.
-    // For this PoC text, I'll write what it *should* look like.
-
-    // Mock loop
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        // In a real app, this would consume from Kafka/Redis
-    }
-}
-
->>>java:auditor
-public class Auditor {
-    public static void main(String[] args) {
-        System.out.println("[Java] Audit Service Started");
-        // Java adapter would listen here
-    }
-}
-
->>>react:dashboard
-import React, { useState, useEffect } from 'react';
-import { useQyro } from 'qyro-client';
-
-export default function Dashboard() {
-    const { on, emit } = useQyro();
-    const [predictions, setPredictions] = useState([]);
-
-    useEffect(() => {
-        on('prediction_ready', (data) => {
-            setPredictions(prev => [...prev, data]);
-        });
-    }, []);
-
-    const sendData = () => {
-        emit('ingest_data', { id: Date.now().toString(), raw_values: [1.5, 2.5] });
-    };
-
-    return (
-        <div className="p-4 bg-gray-900 text-white h-screen">
-            <h1 className="text-2xl font-bold mb-4">AI Prediction Dashboard</h1>
-            <button onClick={sendData} className="bg-blue-600 px-4 py-2 rounded">
-                Simulate Ingest
-            </button>
-            <div className="mt-4 space-y-2">
-                {predictions.map(p => (
-                    <div key={p.id} className="bg-gray-800 p-2 rounded">
-                        Prediction: {p.prediction.toFixed(2)}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
+qyro.start()
