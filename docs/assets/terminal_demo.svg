@@ -1,0 +1,114 @@
+<svg width="800" height="400" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .terminal { fill: #1e1e1e; rx: 10; ry: 10; }
+      .header { fill: #2d2d2d; }
+      .button { r: 6; }
+      .red { fill: #ff5f56; }
+      .yellow { fill: #ffbd2e; }
+      .green { fill: #27c93f; }
+      .text { font-family: 'Courier New', monospace; font-size: 14px; fill: #d4d4d4; }
+      .prompt { fill: #00d4ff; font-weight: bold; }
+      .cmd { fill: #d4d4d4; }
+      .output { fill: #a0a0a0; }
+
+      /* Syntax Highlighting */
+      .keyword { fill: #569cd6; }
+      .string { fill: #ce9178; }
+      .comment { fill: #6a9955; }
+      .meta { fill: #c586c0; }
+
+      @keyframes type-cmd1 {
+        0% { opacity: 0; }
+        10% { opacity: 1; }
+        100% { opacity: 1; }
+      }
+      @keyframes show-code {
+        0% { opacity: 0; }
+        15% { opacity: 0; }
+        20% { opacity: 1; }
+        100% { opacity: 1; }
+      }
+      @keyframes type-cmd2 {
+        0% { opacity: 0; }
+        50% { opacity: 0; }
+        60% { opacity: 1; }
+        100% { opacity: 1; }
+      }
+      @keyframes show-output1 {
+        0% { opacity: 0; }
+        65% { opacity: 0; }
+        70% { opacity: 1; }
+        100% { opacity: 1; }
+      }
+      @keyframes show-output2 {
+        0% { opacity: 0; }
+        75% { opacity: 0; }
+        80% { opacity: 1; }
+        100% { opacity: 1; }
+      }
+      @keyframes show-output3 {
+        0% { opacity: 0; }
+        85% { opacity: 0; }
+        90% { opacity: 1; }
+        100% { opacity: 1; }
+      }
+
+      .line1 { animation: type-cmd1 8s infinite; }
+      .code-block { animation: show-code 8s infinite; }
+      .line2 { animation: type-cmd2 8s infinite; }
+      .out1 { animation: show-output1 8s infinite; }
+      .out2 { animation: show-output2 8s infinite; }
+      .out3 { animation: show-output3 8s infinite; }
+
+    </style>
+  </defs>
+
+  <!-- Window -->
+  <rect x="0" y="0" width="800" height="400" class="terminal" />
+  <rect x="0" y="0" width="800" height="30" class="header" rx="10" ry="10" />
+  <rect x="0" y="20" width="800" height="10" class="terminal" /> <!-- Cover bottom corners of header -->
+
+  <!-- Buttons -->
+  <circle cx="20" cy="15" class="button red" />
+  <circle cx="40" cy="15" class="button yellow" />
+  <circle cx="60" cy="15" class="button green" />
+
+  <!-- Content -->
+  <text x="20" y="60" class="text line1">
+    <tspan class="prompt">➜  ~/qyro</tspan> <tspan class="cmd">cat main.qyro</tspan>
+  </text>
+
+  <g class="code-block">
+    <text x="20" y="90" class="text">
+      <tspan class="meta">&gt;&gt;&gt;schema:global</tspan>
+    </text>
+    <text x="20" y="110" class="text">
+      <tspan class="keyword">data</tspan>: <tspan class="keyword">list</tspan>[<tspan class="keyword">int</tspan>]
+    </text>
+    <text x="20" y="140" class="text">
+      <tspan class="meta">&gt;&gt;&gt;python:producer</tspan>
+    </text>
+    <text x="20" y="160" class="text">
+      <tspan class="keyword">from</tspan> qyro.lib <tspan class="keyword">import</tspan> shared
+    </text>
+    <text x="20" y="180" class="text">
+      shared.append(<tspan class="string">"data"</tspan>, [1, 2, 3])
+    </text>
+    <text x="20" y="210" class="text">
+      <tspan class="meta">&gt;&gt;&gt;c:consumer</tspan>
+    </text>
+    <text x="20" y="230" class="text">
+      <tspan class="keyword">printf</tspan>(<tspan class="string">"Reading from shared memory...\n"</tspan>);
+    </text>
+  </g>
+
+  <text x="20" y="270" class="text line2">
+    <tspan class="prompt">➜  ~/qyro</tspan> <tspan class="cmd">python run.py main.qyro</tspan>
+  </text>
+
+  <text x="20" y="300" class="text out1">[QYRO] Orchestrator Initialized. Starting modules...</text>
+  <text x="20" y="320" class="text out2" fill="#27c93f">[python:producer] Data appended to shared memory</text>
+  <text x="20" y="340" class="text out3" fill="#569cd6">[c:consumer] Reading from shared memory...</text>
+
+</svg>
