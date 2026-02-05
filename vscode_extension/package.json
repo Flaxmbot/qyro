@@ -1,0 +1,29 @@
+{
+  "name": "qyro-vscode",
+  "displayName": "Qyro Polyglot Runtime",
+  "description": "Syntax highlighting and support for Qyro files",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "qyro",
+        "aliases": ["Qyro", "qyro"],
+        "extensions": [".qyro"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "qyro",
+        "scopeName": "source.qyro",
+        "path": "./syntaxes/qyro.tmLanguage.json"
+      }
+    ]
+  }
+}

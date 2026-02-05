@@ -1,0 +1,72 @@
+{
+    "scopeName": "source.qyro",
+    "patterns": [
+        {
+            "include": "#blocks"
+        }
+    ],
+    "repository": {
+        "blocks": {
+            "patterns": [
+                { "include": "#python-block" },
+                { "include": "#js-block" },
+                { "include": "#rust-block" },
+                { "include": "#java-block" }
+            ]
+        },
+        "python-block": {
+            "begin": "^>>>(python):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
+            "beginCaptures": {
+                "1": { "name": "keyword.control.qyro" },
+                "2": { "name": "entity.name.function.qyro" },
+                "3": { "name": "string.quoted.qyro" }
+            },
+            "end": "(?=^>>>)",
+            "contentName": "source.python",
+            "patterns": [
+                { "include": "source.python" }
+            ]
+        },
+        "js-block": {
+            "begin": "^>>>(web|js|ts|react|next):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
+             "beginCaptures": {
+                "1": { "name": "keyword.control.qyro" },
+                "2": { "name": "entity.name.function.qyro" },
+                "3": { "name": "string.quoted.qyro" }
+            },
+            "end": "(?=^>>>)",
+            "contentName": "source.tsx",
+            "patterns": [
+                { "include": "source.tsx" },
+                { "include": "source.ts" },
+                { "include": "source.js" }
+            ]
+        },
+        "rust-block": {
+            "begin": "^>>>(rust):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
+             "beginCaptures": {
+                "1": { "name": "keyword.control.qyro" },
+                "2": { "name": "entity.name.function.qyro" },
+                "3": { "name": "string.quoted.qyro" }
+            },
+            "end": "(?=^>>>)",
+            "contentName": "source.rust",
+            "patterns": [
+                { "include": "source.rust" }
+            ]
+        },
+        "java-block": {
+            "begin": "^>>>(java):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
+             "beginCaptures": {
+                "1": { "name": "keyword.control.qyro" },
+                "2": { "name": "entity.name.function.qyro" },
+                "3": { "name": "string.quoted.qyro" }
+            },
+            "end": "(?=^>>>)",
+            "contentName": "source.java",
+            "patterns": [
+                { "include": "source.java" }
+            ]
+        }
+    }
+}

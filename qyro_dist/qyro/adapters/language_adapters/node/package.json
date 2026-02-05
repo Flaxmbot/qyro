@@ -1,9 +1,0 @@
-{
-  "name": "qyro",
-  "version": "1.0.0",
-  "main": "index.js",
-  "dependencies": {
-    "redis": "^4.6.0",
-    "kafkajs": "^2.2.0"
-  }
-}
