@@ -1,0 +1,12 @@
+
+[package]
+name = "pricing"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+redis = 0.23
+rdkafka = 0.29
+serde = "*"
+tokio = "*"
+serde_json = "*"

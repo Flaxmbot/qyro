@@ -6,8 +6,8 @@ import { Link } from 'react-router-dom';
 export function Hero() {
   return (
     <div className="relative mb-20 overflow-hidden">
-      <div className="absolute top-0 right-0 -z-10 h-[500px] w-[500px] rounded-full bg-primary/5 blur-[120px]" />
-      <div className="absolute bottom-0 left-0 -z-10 h-[300px] w-[300px] rounded-full bg-accent/5 blur-[100px]" />
+      <div className="absolute top-0 right-0 -z-10 h-[500px] w-[500px] rounded-full bg-primary/5 blur-[120px]" aria-hidden="true" />
+      <div className="absolute bottom-0 left-0 -z-10 h-[300px] w-[300px] rounded-full bg-accent/5 blur-[100px]" aria-hidden="true" />
 
       <div className="flex flex-col gap-6 lg:gap-8">
         <motion.div
@@ -16,11 +16,11 @@ export function Hero() {
           transition={{ duration: 0.5 }}
           className="inline-flex items-center gap-2 rounded-full border border-border bg-surfaceHighlight/50 px-3 py-1 text-xs font-medium text-primary w-fit"
         >
-          <span className="relative flex h-2 w-2">
+          <span className="relative flex h-2 w-2" aria-hidden="true">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
           </span>
-          v2.0.0 Now Available
+          v3.0.0 Now Available
         </motion.div>
 
         <motion.h1
@@ -68,8 +68,10 @@ export function Hero() {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.8, delay: 0.4 }}
         className="mt-16 rounded-xl border border-border bg-[#0d1117] shadow-2xl overflow-hidden"
+        role="region"
+        aria-label="Code example showing Qyro syntax"
       >
-        <div className="flex items-center gap-2 border-b border-border bg-surface px-4 py-3">
+        <div className="flex items-center gap-2 border-b border-border bg-surface px-4 py-3" aria-hidden="true">
           <div className="flex gap-1.5">
             <div className="h-3 w-3 rounded-full bg-danger/80" />
             <div className="h-3 w-3 rounded-full bg-[#eab308]/80" />
