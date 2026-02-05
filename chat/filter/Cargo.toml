@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 redis = 0.23
 rdkafka = 0.29
-tokio = "*"
 futures = "*"
+tokio = "*"
 serde_json = "*"
 serde = "*"

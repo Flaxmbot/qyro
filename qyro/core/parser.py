@@ -254,7 +254,7 @@ edition = "2021"
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>Main</mainClass>
+                                    <mainClass>com.qyro.app.Main</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>
@@ -267,15 +267,19 @@ edition = "2021"
 """
         (path / "pom.xml").write_text(pom)
 
-        src_path = path / "src" / "main" / "java"
+        # Package structure com.qyro.app
+        src_path = path / "src" / "main" / "java" / "com" / "qyro" / "app"
         src_path.mkdir(parents=True, exist_ok=True)
         (src_path / "Main.java").write_text(service.content)
 
         # We need to also put Qyro.java there.
         # copy adapters first
         self._copy_adapters(path)
-        # Move Qyro.java to src path
-        adapter_dest = src_path / "com" / "qyro" / "adapters"
+        # Move Qyro.java to correct package path: com.qyro.adapters
+        # src_path is com.qyro.app
+        # We need to go up from src_path
+        java_root = path / "src" / "main" / "java"
+        adapter_dest = java_root / "com" / "qyro" / "adapters"
         adapter_dest.mkdir(parents=True, exist_ok=True)
         shutil.copy(path / "qyro_adapters" / "java_adapter.java", adapter_dest / "Qyro.java")
 

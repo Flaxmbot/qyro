@@ -1,161 +1,130 @@
-<div align="center">
-  <img src="docs/assets/qyro_logo.svg" alt="Qyro Logo" width="600">
+# Qyro 🌀
 
-  <p align="center">
-    <b>The Universal Polyglot Runtime</b>
-    <br>
-    Write Python, C, Rust, Go, Java, and TypeScript in a <i>single file</i> with shared state and event streams.
-  </p>
+**The Universal Polyglot Runtime for SaaS**
 
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-  [![Redis](https://img.shields.io/badge/redis-enabled-red.svg)](https://redis.io/)
-  [![Kafka](https://img.shields.io/badge/kafka-streaming-black.svg)](https://kafka.apache.org/)
-  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
-</div>
+Qyro is a minimalist runtime that lets you build polyglot distributed systems in a single file. It orchestrates Python, Rust, Java, Node.js, and Web components using Docker, with shared state (Redis) and event streaming (Kafka) built-in.
 
 ---
 
-<div align="center">
-  <img src="docs/assets/terminal_demo.svg" alt="Qyro Terminal Demo" width="800">
-</div>
+## 🚀 Features
+
+*   **Single-File Microservices**: Define your entire stack in one `.qyro` file.
+*   **Polyglot**: Support for Python, Rust, Java, Node.js/Web.
+*   **Shared State**: Built-in `qyro.get()` and `qyro.set()` backed by Redis.
+*   **Event Driven**: Built-in `qyro.publish()` and `qyro.subscribe()` backed by Kafka.
+*   **SaaS CLI**: Beautiful, interactive terminal interface.
+*   **VS Code Support**: Syntax highlighting for embedded languages.
 
 ---
 
-## 🚀 The Singularity for Code
-
-**Qyro** breaks down language barriers. It allows you to define an entire distributed system—backend logic, high-performance kernels, and frontend UI—in a single `.qyro` file.
-
-The **Qyro Orchestrator** parses this file, compiles native code (C/Rust/Go) on the fly, launches microservices, and connects them via a high-speed **Shared Memory Event Bus** (Redis) and **Reliable Event Streaming** (Kafka).
-
-### ✨ Key Features
-
-| Feature | Description |
-|---------|-------------|
-| **🏳️‍🌈 Polyglot** | Mix Python, C, Rust, Go, Java, TypeScript, and React in one file. |
-| **🧠 Shared State** | Zero-latency variable sharing across languages via Redis. |
-| **📡 Event Driven** | Built-in Kafka integration for reliable, scalable messaging. |
-| **🛡️ Self-Healing** | Automatic process supervision, crash detection, and exponential backoff. |
-| **⚡ High Performance** | Compile native modules on-the-fly for critical paths. |
-| **🌐 API Gateway** | Integrated WebSocket/HTTP gateway for external access. |
-
----
-
-## 🏗️ Architecture
-
-Qyro isn't just a runner; it's a complete operating environment.
-
-```mermaid
-graph TD
-    %% Styling
-    classDef core fill:#1e1e1e,stroke:#00d4ff,stroke-width:2px,color:#fff
-    classDef polyglot fill:#2d2d2d,stroke:#00ff9d,stroke-width:2px,color:#fff
-    classDef store fill:#1e1e1e,stroke:#ff00aa,stroke-width:2px,color:#fff
-    classDef stream fill:#1e1e1e,stroke:#fff,stroke-width:2px,color:#fff
-
-    subgraph Singularity["The Singularity (main.qyro)"]
-        direction TB
-        Src["Source Code"] -->|Parser| Parse["Qyro Parser"]
-    end
-
-    Parse -->|Compiles| BinC["C/Rust/Go Binaries"]
-    Parse -->|Prepares| ScriptPy["Python/TS Scripts"]
-
-    subgraph Runtime["Runtime Environment"]
-        direction TB
-        Orch["Qyro Orchestrator"]
-
-        P1["Process 1 (Python)"]
-        P2["Process 2 (C/Rust)"]
-        P3["Process 3 (Node)"]
-
-        Orch -->|Supervises| P1
-        Orch -->|Supervises| P2
-        Orch -->|Supervises| P3
-
-        GW["API Gateway"] <-->|WS/HTTP| P1
-    end
-
-    P1 <-->|Read/Write| Redis[("Redis Shared State")]
-    P2 <-->|Read/Write| Redis
-    P3 <-->|Read/Write| Redis
-
-    P1 <-->|Pub/Sub| Kafka{"Kafka Event Bus"}
-    P2 <-->|Pub/Sub| Kafka
-
-    %% Apply styles
-    class Src,Parse,Orch,GW core
-    class P1,P2,P3,BinC,ScriptPy polyglot
-    class Redis store
-    class Kafka stream
-```
-
----
-
-## ⚡ Quick Start
-
-### Prerequisites
-*   Python 3.8+
-*   Redis (Optional, for shared state)
-*   Kafka (Optional, for event streaming)
-
-### Installation
+## 📦 Installation
 
 ```bash
-git clone https://github.com/qyro-dev/qyro.git
-cd qyro
-pip install -r requirements.txt
+pip install .
 ```
 
-### Running Your First App
+Dependencies:
+*   Docker Desktop (must be running)
+*   Python 3.9+
 
-Create a file named `hello.qyro`:
+---
+
+## 🛠 Usage
+
+### 1. Initialize a Project
+
+```bash
+qyro init myapp
+cd myapp
+```
+
+### 2. Define Services (`myapp.qyro`)
 
 ```python
->>>schema:global
-# Define shared state variables
-counter: int
+>>>web:frontend [react, axios]
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 
->>>python:p1
-import time
-from qyro.lib import shared
-print("Python: Starting counter...")
-while True:
-    val = shared.get("counter") or 0
-    shared.set("counter", val + 1)
-    time.sleep(1)
-
->>>c:p2
-#include <stdio.h>
-// C code runs natively!
-int main() {
-    printf("C Module: Watching shared memory...\n");
-    while(1) {
-        // Pseudo-code for brevity
-        sleep(1);
-    }
-    return 0;
+export default function App() {
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    axios.get("http://localhost:8000/").then(r => setMsg(r.data.message));
+  }, []);
+  return <h1>{msg}</h1>;
 }
+
+>>>python:api [fastapi, uvicorn]
+from fastapi import FastAPI
+import qyro_adapters.python_adapter as qyro
+
+app = FastAPI()
+
+@app.get("/")
+def root():
+    # Use shared memory
+    count = qyro.get("count") or 0
+    qyro.set("count", int(count) + 1)
+    return {"message": f"Hello from Python! Count: {count}"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-Run it:
+### 3. Run
 
 ```bash
-python run.py hello.qyro
+qyro run myapp.qyro
 ```
 
----
-
-## 📚 Documentation
-
-Detailed documentation is available in the [Wiki](https://github.com/qyro-dev/qyro/wiki).
-
-*   [Language Reference](https://github.com/qyro-dev/qyro/wiki/Language-Reference)
-*   [API Guide](https://github.com/qyro-dev/qyro/wiki/API-Guide)
-*   [Deployment](https://github.com/qyro-dev/qyro/wiki/Deployment)
+This will:
+1.  Parse the `.qyro` file.
+2.  Generate Dockerfiles, `docker-compose.yml`, and dependency manifests.
+3.  Start Redis, Kafka, and your services.
+4.  Stream logs to your terminal.
 
 ---
 
-<div align="center">
-  <sub>Built with ❤️ by the Qyro Team. Code simpler. Build faster. Scale infinitely.</sub>
-</div>
+## 🧩 Language Support
+
+### Python
+*   **Header**: `>>>python:name [pip-deps]`
+*   **Adapter**: `import qyro_adapters.python_adapter as qyro`
+
+### Web (React/Next.js)
+*   **Header**: `>>>web:name [npm-deps]`
+*   **Adapter**: `import qyro from './qyro_adapters/js_adapter'` (if needed)
+*   **Ports**: Automatically exposed on `3000`.
+
+### Rust
+*   **Header**: `>>>rust:name [crate-deps]`
+*   **Adapter**: `mod qyro;` (injected helper)
+
+### Java
+*   **Header**: `>>>java:name [maven-deps]`
+*   **Adapter**: `com.qyro.adapters.Qyro`
+
+---
+
+## 💻 VS Code Extension
+
+1.  Open `vscode_extension/` folder.
+2.  Run/Debug to install the extension.
+3.  Enjoy syntax highlighting for all embedded languages!
+
+---
+
+## 🏗 Architecture
+
+Qyro v3 compiles your intent into standard infrastructure:
+
+*   **Orchestration**: Docker Compose
+*   **State**: Redis (Shared Key-Value)
+*   **Messaging**: Kafka (Pub/Sub)
+*   **Networking**: Internal Docker bridge network `qyro-net`
+
+---
+
+## 📄 License
+
+MIT
