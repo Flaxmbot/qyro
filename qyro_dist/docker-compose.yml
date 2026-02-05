@@ -1,0 +1,82 @@
+services:
+  qyro-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+      - "3000:3000"
+    environment:
+      - QYRO_REDIS_HOST=redis
+      - QYRO_REDIS_PORT=6379
+      - QYRO_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - qyro-network
+    restart: unless-stopped
+    tty: true
+
+  redis:
+    image: redis:7-alpine
+    container_name: qyro-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - qyro-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: qyro-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - qyro-network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo stat | nc localhost 2181 | grep -q 'Mode:'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: qyro-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - qyro-network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092 | grep -q '3.5'"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 120s
+
+networks:
+  qyro-network:
+    driver: bridge

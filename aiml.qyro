@@ -1,36 +1,95 @@
->>>python:model [scikit-learn]
+>>>python:model [scikit-learn, numpy, pandas, qyro]
 from qyro.lib import qyro
-import time
+import pickle
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 
 print("[Model] Loading AI Model...")
-time.sleep(2)
+# Load or train model
+def load_model():
+    try:
+        with open('model.pkl', 'rb') as f:
+            return pickle.load(f)
+    except:
+        model = RandomForestClassifier()
+        return model
+
+model = load_model()
 print("[Model] Ready.")
 
-@qyro.on("ingest_data")
+@qyro.on("train_model")
+def train_model(data):
+    """Train ML model on provided data"""
+    X = np.array(data.get("features"))
+    y = np.array(data.get("labels"))
+    model.fit(X, y)
+    
+    # Save model
+    with open('model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+    
+    qyro.emit("model_trained", {"accuracy": model.score(X, y)})
+    return {"status": "trained"}
+
+@qyro.on("predict")
 def predict(data):
-    print(f"[Model] Predicting for {data}...")
-    time.sleep(0.5)
-    qyro.emit("prediction_ready", {"input": data, "prediction": "anomaly_detected"})
+    """Make predictions using the model"""
+    features = np.array(data.get("features")).reshape(1, -1)
+    prediction = model.predict(features)
+    
+    qyro.emit("prediction_made", {
+        "prediction": int(prediction[0]),
+        "confidence": float(max(model.predict_proba(features)[0]))
+    })
+    return {"prediction": int(prediction[0])}
 
-qyro.start()
+if __name__ == "__main__":
+    qyro.start()
 
->>>python:ingest
+>>>python:ingest [pandas, numpy, qyro]
 from qyro.lib import qyro
 import time
 
 print("[Ingest] Service Started")
-while True:
-    time.sleep(5)
-    print("[Ingest] Emitting sensor data...")
-    qyro.emit("ingest_data", {"sensor_id": "cam_01", "timestamp": time.time()})
 
->>>python:analytics
+@qyro.on("ingest_data")
+def ingest_data(data):
+    """Ingest and preprocess raw data"""
+    source = data.get("source", "default")
+    # Process data...
+    qyro.emit("data_ingested", {"source": source, "rows": 1000})
+    return {"status": "ingested"}
+
+@qyro.on("raw_sensor_data")
+def handle_sensor_data(data):
+    """Handle incoming sensor data"""
+    sensor_id = data.get("sensor_id", "unknown")
+    timestamp = data.get("timestamp", time.time())
+    qyro.emit("sensor_data_processed", {"sensor_id": sensor_id, "timestamp": timestamp})
+    return {"status": "processed"}
+
+if __name__ == "__main__":
+    qyro.start()
+
+>>>python:analytics [pandas, matplotlib, qyro]
 from qyro.lib import qyro
 
 print("[Analytics] Service Started")
 
-@qyro.on("prediction_ready")
-def analyze(data):
-    print(f"[Analytics] Received prediction: {data['prediction']}")
+@qyro.on("generate_report")
+def generate_report(data):
+    """Generate analytics report"""
+    report_type = data.get("type", "summary")
+    # Create visualizations...
+    qyro.emit("report_ready", {"report": f"analytics_{report_type}.pdf"})
+    return {"status": "generated"}
 
-qyro.start()
+@qyro.on("analyze_trends")
+def analyze_trends(data):
+    """Analyze data trends"""
+    timeframe = data.get("timeframe", "7d")
+    qyro.emit("trends_analyzed", {"timeframe": timeframe, "trend": "upward"})
+    return {"trend": "upward"}
+
+if __name__ == "__main__":
+    qyro.start()

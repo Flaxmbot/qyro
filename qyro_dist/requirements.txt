@@ -1,0 +1,13 @@
+fastapi
+pydantic
+qyro
+redis
+requests
+uvicorn
+websockets
+redis
+confluent-kafka
+rich
+pydantic
+docker
+click

@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # Redis for chat app and other services
+  redis:
+    image: redis:7-alpine
+    container_name: qyro-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - qyro-network
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: qyro-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - qyro-network
+
+  # Kafka for event streaming
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: qyro-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - qyro-network
+
+  # Chat App Service
+  qyro-chat:
+    build:
+      context: .
+      dockerfile: qyro_runner.Dockerfile
+    container_name: qyro-chat
+    depends_on:
+      - redis
+      - kafka
+    volumes:
+      - ./chat_app.qyro:/app/chat_app.qyro:ro
+      - ./qyro_dist/modules:/app/modules:ro
+      - chat_app_data:/app/data
+    ports:
+      - "3000:3000"  # React dev server
+      - "8000:8000"  # Python/FastAPI server
+      - "8080:8080"  # Rust service
+      - "8081:8081"  # Java service
+    environment:
+      - QYRO_PROJECT=chat_app
+      - QYRO_REDIS_URL=redis://redis:6379
+      - QYRO_KAFKA_URL=kafka://kafka:9092
+      - QYRO_MODE=polyglot
+    command: >
+      sh -c "qyro run --watch --file /app/chat_app.qyro"
+    networks:
+      - qyro-network
+    restart: unless-stopped
+
+  # AI/ML Pipeline Service
+  qyro-aiml:
+    build:
+      context: .
+      dockerfile: qyro_runner.Dockerfile
+    container_name: qyro-aiml
+    depends_on:
+      - redis
+      - kafka
+    volumes:
+      - ./aiml.qyro:/app/aiml.qyro:ro
+      - ./qyro_dist/modules:/app/modules:ro
+      - aiml_data:/app/data
+      - aiml_models:/app/models
+    ports:
+      - "5000:5000"  # ML API
+      - "5001:5001"  # Ingestion service
+      - "5002:5002"  # Analytics service
+    environment:
+      - QYRO_PROJECT=aiml
+      - QYRO_REDIS_URL=redis://redis:6379
+      - QYRO_KAFKA_URL=kafka://kafka:9092
+      - QYRO_MODE=python
+    command: >
+      sh -c "qyro run --watch --file /app/aiml.qyro"
+    networks:
+      - qyro-network
+    restart: unless-stopped
+
+  # E-commerce API Service
+  qyro-ecommerce:
+    build:
+      context: .
+      dockerfile: qyro_runner.Dockerfile
+    container_name: qyro-ecommerce
+    depends_on:
+      - redis
+      - kafka
+    volumes:
+      - ./ecommerce.qyro:/app/ecommerce.qyro:ro
+      - ./qyro_dist/modules:/app/modules:ro
+      - ecommerce_data:/app/data
+    ports:
+      - "4000:4000"  # FastAPI
+      - "4001:4001"  # Node.js payment
+      - "4002:4002"  # Inventory service
+    environment:
+      - QYRO_PROJECT=ecommerce
+      - QYRO_REDIS_URL=redis://redis:6379
+      - QYRO_KAFKA_URL=kafka://kafka:9092
+      - QYRO_MODE=polyglot
+    command: >
+      sh -c "qyro run --watch --file /app/ecommerce.qyro"
+    networks:
+      - qyro-network
+    restart: unless-stopped
+
+networks:
+  qyro-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  chat_app_data:
+  aiml_data:
+  aiml_models:
+  ecommerce_data:
