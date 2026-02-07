@@ -2,7 +2,6 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 
 interface SidebarProps {
-  type: 'docs' | 'api';
   isOpen: boolean;
   onMouseLeave?: () => void;
 }
@@ -24,12 +23,12 @@ const docsNav: NavSection[] = [
       { label: 'Introduction', path: '/docs/introduction' },
       { label: 'Installation', path: '/docs/installation' },
       { label: 'Hello World', path: '/docs/hello-world' },
+      { label: 'Architecture', path: '/docs/architecture' },
     ],
   },
   {
-    title: 'Core',
+    title: 'Core Concepts',
     items: [
-      { label: 'Architecture', path: '/docs/architecture' },
       { label: 'Bindings', path: '/docs/bindings' },
       { label: 'Sandboxing', path: '/docs/sandboxing' },
     ],
@@ -38,44 +37,38 @@ const docsNav: NavSection[] = [
     title: 'Guides',
     items: [
       { label: 'Python', path: '/docs/guides/python' },
-      { label: 'Rust', path: '/docs/guides/rust' },
-      { label: 'Java', path: '/docs/guides/java' },
       { label: 'Node.js', path: '/docs/guides/node' },
+      { label: 'Rust', path: '/docs/guides/rust' },
+      { label: 'Go', path: '/docs/guides/go' },
     ],
   },
+  {
+    title: 'Reference',
+    items: [
+      { label: 'CLI', path: '/docs/reference/cli' },
+      { label: 'Configuration', path: '/docs/reference/config' },
+      { label: 'SDK / API', path: '/api' },
+    ]
+  },
+  {
+    title: 'Resources',
+    items: [
+      { label: 'Advanced Patterns', path: '/docs/resources/advanced' },
+      { label: 'Deployment', path: '/docs/resources/deployment' },
+      { label: 'Contributing', path: '/docs/resources/contributing' },
+      { label: 'Troubleshooting', path: '/docs/resources/troubleshooting' },
+      { label: 'Changelog', path: '/docs/resources/changelog' },
+      { label: 'Roadmap', path: '/docs/resources/roadmap' },
+      { label: 'Blog', path: '/blog' },
+    ]
+  }
 ];
 
-const apiNav: NavSection[] = [
-  {
-    title: 'General',
-    items: [
-      { label: 'Overview', path: '/api' },
-      { label: 'Authentication', path: '/api/auth' },
-      { label: 'Rate Limits', path: '/api/limits' },
-    ],
-  },
-  {
-    title: 'Runtimes',
-    items: [
-      { label: 'List Runtimes', path: '/api/runtimes/list' },
-      { label: 'Create Runtime', path: '/api/runtimes/create' },
-      { label: 'Execute Code', path: '/api/runtimes/execute' },
-    ],
-  },
-  {
-    title: 'Storage',
-    items: [
-      { label: 'KV Store', path: '/api/storage/kv' },
-      { label: 'Blob Storage', path: '/api/storage/blob' },
-    ],
-  },
-];
-
-export const Sidebar: React.FC<SidebarProps> = ({ type, isOpen, onMouseLeave }) => {
-  const sections = type === 'api' ? apiNav : docsNav;
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onMouseLeave }) => {
+  const sections = docsNav;
 
   return (
-    <aside 
+    <aside
       onMouseLeave={onMouseLeave}
       className={`
         fixed inset-y-0 left-0 z-[60] w-72 pt-20 pb-10 
@@ -98,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ type, isOpen, onMouseLeave }) 
             <ul className="space-y-2 border-l border-white/5 ml-2 pl-6">
               {section.items.map((item, itemIdx) => (
                 <li key={itemIdx}>
-                  <NavLink 
+                  <NavLink
                     to={item.path}
                     end={item.path === '/api' || item.path === '/'}
                     className={({ isActive }) => `
@@ -120,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ type, isOpen, onMouseLeave }) 
             </ul>
           </div>
         ))}
-        
+
         <div className="pt-8 border-t border-white/5 mt-auto">
           <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-gray-500 font-mono">
             <span>Version</span>
