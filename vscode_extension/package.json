@@ -2,7 +2,7 @@
   "name": "qyro-vscode",
   "displayName": "Qyro Polyglot Runtime",
   "description": "Syntax highlighting, snippets, and language support for Qyro polyglot files",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "publisher": "qyro",
   "license": "MIT",
   "repository": {

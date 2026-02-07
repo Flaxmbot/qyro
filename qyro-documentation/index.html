@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qyro - The Universal Polyglot Runtime</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "holo-white": "#ffffff",
+              "holo-blue": "#a5f3fc",
+              "holo-bg": "#000000",
+              "glass-border": "rgba(255, 255, 255, 0.15)",
+              "glass-bg": "rgba(5, 5, 10, 0.4)",
+            },
+            fontFamily: {
+              sans: ["Space Grotesk", "sans-serif"],
+              mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
+            },
+            backgroundImage: {
+              "grid-holographic":
+                "linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px)",
+            },
+            boxShadow: {
+              "holo-glow": "0 0 15px rgba(165, 243, 252, 0.15), inset 0 0 10px rgba(165, 243, 252, 0.05)",
+              "neon-blue": "0 0 10px rgba(56, 189, 248, 0.5), 0 0 20px rgba(56, 189, 248, 0.3)",
+            },
+            animation: {
+              scanline: "scanline 8s linear infinite",
+              flicker: "flicker 4s infinite",
+              float: "float 6s ease-in-out infinite",
+              "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+              "slide-up": "slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+              "fade-in": "fadeIn 0.5s ease-out forwards",
+              "spin-slow": "spin 12s linear infinite",
+              "reverse-spin": "reverseSpin 15s linear infinite",
+              "orbit": "orbit 20s linear infinite",
+              "dash": "dash 3s linear infinite",
+            },
+            keyframes: {
+              scanline: {
+                "0%": { backgroundPosition: "0 0" },
+                "100%": { backgroundPosition: "0 100%" },
+              },
+              flicker: {
+                "0%, 19.999%, 22%, 62.999%, 64%, 64.999%, 70%, 100%": { opacity: 0.99 },
+                "20%, 21.999%, 63%, 63.999%, 65%, 69.999%": { opacity: 0.8 },
+              },
+              float: {
+                "0%, 100%": { transform: "translateY(0)" },
+                "50%": { transform: "translateY(-10px)" },
+              },
+              slideUp: {
+                "0%": { transform: "translateY(20px)", opacity: 0 },
+                "100%": { transform: "translateY(0)", opacity: 1 },
+              },
+              fadeIn: {
+                "0%": { opacity: 0 },
+                "100%": { opacity: 1 },
+              },
+              reverseSpin: {
+                "0%": { transform: "rotate(360deg)" },
+                "100%": { transform: "rotate(0deg)" },
+              },
+              orbit: {
+                "0%": { transform: "rotate(0deg)" },
+                "100%": { transform: "rotate(360deg)" },
+              },
+              dash: {
+                "0%": { strokeDashoffset: "24" },
+                "100%": { strokeDashoffset: "0" },
+              }
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        background-color: #000000;
+        color: #eeeeee;
+        overflow-x: hidden;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+      .holo-corner {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border-color: rgba(255, 255, 255, 0.6);
+        border-style: solid;
+        transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 20;
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+      }
+      .holo-panel:hover .holo-corner {
+        border-color: #a5f3fc;
+        box-shadow: 0 0 15px #a5f3fc;
+        width: 100%;
+        height: 100%;
+        opacity: 0.15;
+      }
+      .text-shadow-glow {
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+      }
+      .glass-panel-holo {
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+      }
+      .glass-panel-holo:hover {
+         transform: translateY(-2px);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

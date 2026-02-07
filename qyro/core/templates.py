@@ -4,18 +4,18 @@ from typing import Dict
 DOCKERFILE_COMMON_BASE = """
 FROM alpine:3.18
 
-# Install common system dependencies
+# Install minimal system dependencies
 RUN apk add --no-cache \
     curl \
-    wget \
-    git \
-    bash \
-    openssh \
     ca-certificates
 
 # Create app directory
 RUN mkdir -p /app
 WORKDIR /app
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S qyro && \
+    adduser -u 1001 -S qyro -G qyro
 
 # Set environment variables for consistency
 ENV APP_HOME=/app \
@@ -24,6 +24,12 @@ ENV APP_HOME=/app \
 
 # Copy Qyro adapters (shared across all languages)
 COPY qyro_adapters /app/qyro_adapters
+
+# Change ownership to non-root user
+RUN chown -R qyro:qyro /app
+
+# Switch to non-root user
+USER qyro
 """
 
 # Language-specific base images that extend the common base
@@ -33,15 +39,7 @@ FROM qyro/common-base:latest
 # Install Python runtime and dependencies
 RUN apk add --no-cache \
     python3 \
-    python3-dev \
-    py3-pip \
-    gcc \
-    musl-dev \
-    libffi-dev \
-    openssl-dev
-
-# Upgrade pip
-RUN pip3 install --no-cache-dir --upgrade pip
+    py3-pip
 
 # Install common Python dependencies (shared across all Python services)
 RUN pip3 install --no-cache-dir \
@@ -64,22 +62,24 @@ RUN apk add --no-cache \
     npm
 
 # Install common Node.js dependencies (shared across all Node.js services)
-RUN npm install -g \
-    axios \
-    ioredis \
-    kafkajs
+COPY package*.json ./
+RUN npm ci --only=production
 
 # Set Node.js environment variables
 ENV NODE_ENV=production
 """
 
 DOCKERFILE_JAVA_BASE = """
-FROM eclipse-temurin:17-jdk-alpine AS java-base
+FROM eclipse-temurin:17-jre-alpine AS java-base
 
-# Install build tools
-RUN apk add --no-cache curl wget git bash ca-certificates maven
+# Install minimal tools
+RUN apk add --no-cache ca-certificates maven
 
 WORKDIR /app
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S qyro && \
+    adduser -u 1001 -S qyro -G qyro
 
 # Pre-download common Maven dependencies for Kafka/Redis
 RUN mkdir -p /tmp/warmup && cd /tmp/warmup && \
@@ -87,20 +87,30 @@ RUN mkdir -p /tmp/warmup && cd /tmp/warmup && \
     mvn dependency:go-offline -q && rm -rf /tmp/warmup
 
 ENV APP_HOME=/app LANG=C.UTF-8
+
+# Copy Qyro adapters
 COPY qyro_adapters /app/qyro_adapters
+
+# Change ownership to non-root user
+RUN chown -R qyro:qyro /app
+
+# Switch to non-root user
+USER qyro
 """
 
 DOCKERFILE_RUST_BASE = """
-FROM rust:1.83 AS rust-base
+FROM rust:1.83-slim AS rust-base
 
-# Install system dependencies for native compilation
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl wget git bash ca-certificates \
-    build-essential pkg-config cmake \
-    libssl-dev libsasl2-dev \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Create non-root user for security
+RUN groupadd -g 1001 qyro && \
+    useradd -u 1001 -g qyro -m -s /bin/bash qyro
 
 # Pre-compile common crates (cached in image)
 RUN mkdir -p /tmp/warmup && cd /tmp/warmup && \
@@ -109,8 +119,16 @@ RUN mkdir -p /tmp/warmup && cd /tmp/warmup && \
     cargo build --release 2>/dev/null || true && \
     rm -rf /tmp/warmup
 
-ENV APP_HOME=/app LANG=C.UTF-8 CARGO_HOME=/root/.cargo
+ENV APP_HOME=/app LANG=C.UTF-8 CARGO_HOME=/home/qyro/.cargo
+
+# Copy Qyro adapters
 COPY qyro_adapters /app/qyro_adapters
+
+# Change ownership to non-root user
+RUN chown -R qyro:qyro /app
+
+# Switch to non-root user
+USER qyro
 """
 
 # Service-specific Dockerfile templates that use language-specific bases
@@ -121,7 +139,7 @@ WORKDIR /app
 
 # Copy requirements and install service-specific dependencies
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --user -r requirements.txt
 
 # Copy application code
 COPY . .
@@ -133,21 +151,28 @@ CMD ["python3", "{filename}"]
 DOCKERFILE_UNIVERSAL_PYTHON = """
 FROM python:3.11-slim
 
-# Install system dependencies if any
-RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev \\
+# Install minimal system dependencies if any
+RUN apt-get update && apt-get install -y --no-install-recommends \\
     && rm -rf /var/lib/apt/lists/*
 
-# Install common Python dependencies
-RUN pip install redis kafka-python requests
+# Create non-root user for security
+RUN groupadd -g 1001 qyro && \\
+    useradd -u 1001 -g qyro -m -s /bin/bash qyro
 
 WORKDIR /app
 
 # Copy requirements and install
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Copy application code
 COPY . .
+
+# Change ownership to non-root user
+RUN chown -R qyro:qyro /app
+
+# Switch to non-root user
+USER qyro
 
 # Run command
 CMD ["python", "{filename}"]
@@ -175,8 +200,8 @@ FROM qyro/node-base:latest
 WORKDIR /app
 
 # Copy package.json and install service-specific dependencies
-COPY package.json .
-RUN npm install --production
+COPY package*.json ./
+RUN npm ci --only=production
 
 # Copy application code
 COPY . .
@@ -197,7 +222,7 @@ COPY src ./src
 # Build the application (uses Maven cache from base image)
 RUN mvn package -DskipTests
 
-# Run command
+# Run command - use exec form to avoid shell process
 CMD ["java", "-jar", "target/*.jar"]
 """
 
@@ -213,23 +238,82 @@ COPY src ./src
 # Build the application (uses Cargo cache from base image)
 RUN cargo build --release
 
-# Run command
+# Run command - executable is already owned by qyro user
 CMD ["./target/release/{bin_name}"]
 """
 
 DOCKERFILE_UNIVERSAL_RUST = """
-FROM rust:1.83
+FROM rust:1.83-slim
 
-# Install common Rust dependencies
-RUN cargo install redis rdkafka serde serde_json tokio
+# Install minimal system dependencies for compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN groupadd -g 1001 qyro && \
+    useradd -u 1001 -g qyro -m -s /bin/bash qyro
 
 WORKDIR /app
 
+# Copy and build - dependencies come from Cargo.toml
 COPY Cargo.toml .
 COPY src ./src
+COPY qyro_adapters ./src/qyro_adapters
 RUN cargo build --release
 
+# Change ownership to non-root user
+RUN chown -R qyro:qyro /app
+
+# Switch to non-root user
+USER qyro
+
 CMD ["./target/release/{bin_name}"]
+"""
+
+
+DOCKERFILE_PYTHON_PROD = """
+# Stage 1: Builder
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+    gcc libc-dev libffi-dev \\
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Stage 2: Runner
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY --from=builder /install /usr/local
+COPY . .
+
+# Avoid running as root
+RUN useradd -m qyro && chown -R qyro:qyro /app
+USER qyro
+
+CMD ["python", "{filename}"]
+"""
+
+DOCKERFILE_WEB_PROD = """
+# Stage 1: Builder
+FROM node:18-alpine as builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 2: Serve
+FROM node:18-alpine
+WORKDIR /app
+RUN npm install -g serve
+COPY --from=builder /app/build ./build
+CMD ["serve", "-s", "build", "-l", "3000"]
 """
 
 # Base image tags
@@ -245,11 +329,15 @@ version: '3.8'
 
 services:
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     networks:
       - qyro-net
+    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -257,30 +345,39 @@ services:
       retries: 5
 
   kafka:
-    image: apache/kafka:latest
+    image: apache/kafka:3.7.0
+    restart: unless-stopped
     ports:
       - "9092:9092"
     environment:
-      - KAFKA_NODE_ID=1
-      - KAFKA_PROCESS_ROLES=broker,controller
-      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
-      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
-      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
     networks:
       - qyro-net
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 30s
       timeout: 10s
-      retries: 10
+      retries: 5
+      start_period: 30s
 
 {services}
+
+volumes:
+  redis_data:
+  kafka_data:
 
 networks:
   qyro-net:

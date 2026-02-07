@@ -4,6 +4,8 @@
 //! - Shared state (Redis)
 //! - Event streaming (Kafka)
 //! - Cross-language RPC
+//!
+//! For detailed usage examples, visit: https://qyro.dev/docs/rust-adapter
 
 use redis::Commands;
 use rdkafka::config::ClientConfig;
@@ -189,7 +191,8 @@ impl Qyro {
 
     /// Create a Kafka consumer for subscribing.
     pub fn create_consumer(topic: &str, group_id: Option<&str>) -> StreamConsumer {
-        let gid = group_id.unwrap_or(&format!("qyro-{}", *SERVICE_NAME));
+        let default_gid = format!("qyro-{}", *SERVICE_NAME);
+        let gid = group_id.unwrap_or(&default_gid);
         
         let consumer: StreamConsumer = ClientConfig::new()
             .set("bootstrap.servers", &*KAFKA_SERVERS)

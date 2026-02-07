@@ -94,7 +94,7 @@ from typing import List
 import time, sys, uuid
 
 sys.path.insert(0, '/app/qyro_adapters')
-from python_adapter import set, get, publish, expose, call, info, register_service
+from python_adapter import set as redis_set, get as redis_get, publish, expose, call, info, register_service
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -162,7 +162,7 @@ async def create_order(req: OrderRequest):
         total = calculate_total(items)
     
     order = {"id": order_id, "items": items, "total": total, "status": "pending", "created": time.time()}
-    set(f"order:{order_id}", order)
+    redis_set(f"order:{order_id}", order)
     publish("orders.created", order)
     
     return {"success": True, "order_id": order_id, "total": total}
@@ -225,7 +225,8 @@ public class Main {
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-mod qyro_adapters { include!("qyro_adapters/rust_adapter.rs"); }
+#[path = "qyro_adapters/rust_adapter.rs"]
+mod qyro_adapters;
 use qyro_adapters::Qyro;
 
 fn get_price(id: &str) -> f64 {

@@ -4,6 +4,8 @@
 // - Shared state (Redis)
 // - Event streaming (Kafka)
 // - Cross-language RPC
+//
+// For detailed usage examples, visit: https://qyro.dev/docs/go-adapter
 
 package qyro
 

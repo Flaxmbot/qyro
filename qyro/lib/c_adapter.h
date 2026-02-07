@@ -5,6 +5,8 @@
  * - Shared state (Redis via hiredis)
  * - Event streaming (Kafka via librdkafka)
  * - Cross-language RPC
+ *
+ * For detailed usage examples, visit: https://qyro.dev/docs/c-adapter
  */
 
 #ifndef QYRO_ADAPTER_H
@@ -113,14 +115,17 @@ static int qyro_set(const char* key, const char* value) {
 static char* qyro_get(const char* key) {
     redisContext* ctx = qyro_get_redis();
     if (!ctx) return NULL;
-    
+
     redisReply* reply = redisCommand(ctx, "GET %s", key);
     if (!reply || reply->type != REDIS_REPLY_STRING) {
         if (reply) freeReplyObject(reply);
         return NULL;
     }
-    
-    char* result = strdup(reply->str);
+
+    char* result = NULL;
+    if (reply->str) {
+        result = strdup(reply->str);
+    }
     freeReplyObject(reply);
     return result;
 }
@@ -241,14 +246,17 @@ static void qyro_uuid(char* buf) {
 static char* qyro_call(const char* function_path, cJSON* args) {
     char request_id[64];
     qyro_uuid(request_id);
-    
+
     /* Extract target service */
     char target[128] = {0};
     const char* dot = strchr(function_path, '.');
     if (dot) {
         strncpy(target, function_path, dot - function_path);
+        target[dot - function_path] = '\0';
+    } else {
+        strcpy(target, function_path);
     }
-    
+
     /* Build request JSON */
     cJSON* request = cJSON_CreateObject();
     cJSON_AddStringToObject(request, "request_id", request_id);
@@ -258,16 +266,20 @@ static char* qyro_call(const char* function_path, cJSON* args) {
     cJSON_AddItemToObject(request, "args", args ? cJSON_Duplicate(args, 1) : cJSON_CreateArray());
     cJSON_AddObjectToObject(request, "kwargs");
     cJSON_AddNumberToObject(request, "timestamp", (double)time(NULL));
-    
+
     char* req_str = cJSON_PrintUnformatted(request);
-    qyro_publish(QYRO_RPC_TOPIC, req_str);
-    
+
+    // Create a temporary entry for the pending request
+    // In a real implementation, we'd use a proper synchronization mechanism
+    // For now, we'll return a placeholder that indicates this is not fully implemented
+    // since synchronous calls in C require complex thread synchronization
+
+    char* result = strdup("{\"error\": \"Synchronous RPC calls not fully implemented in C adapter\"}");
+
     free(req_str);
     cJSON_Delete(request);
-    
-    /* Note: Synchronous response handling would require a more complex
-       implementation with threads. This is a fire-and-forget version. */
-    return strdup("{\"pending\": true}");
+
+    return result;
 }
 
 /* RPC Server thread function */
@@ -276,65 +288,77 @@ static void* qyro_rpc_server_thread(void* arg) {
     rd_kafka_conf_t* conf;
     rd_kafka_topic_partition_list_t* topics;
     char errstr[512];
-    
+
     conf = rd_kafka_conf_new();
     rd_kafka_conf_set(conf, "bootstrap.servers", QYRO_KAFKA_SERVERS, NULL, 0);
-    
+
     char group_id[256];
     snprintf(group_id, sizeof(group_id), "qyro-rpc-server-%s", QYRO_SERVICE_NAME);
     rd_kafka_conf_set(conf, "group.id", group_id, NULL, 0);
     rd_kafka_conf_set(conf, "auto.offset.reset", "latest", NULL, 0);
-    
+
     consumer = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errstr, sizeof(errstr));
     if (!consumer) {
         qyro_error("Failed to create consumer");
         return NULL;
     }
-    
+
     topics = rd_kafka_topic_partition_list_new(1);
     rd_kafka_topic_partition_list_add(topics, QYRO_RPC_TOPIC, RD_KAFKA_PARTITION_UA);
     rd_kafka_subscribe(consumer, topics);
     rd_kafka_topic_partition_list_destroy(topics);
-    
+
     char msg[256];
     snprintf(msg, sizeof(msg), "RPC Server started for service: %s", QYRO_SERVICE_NAME);
     qyro_info(msg);
-    
+
+    // Set a timeout to allow checking for termination condition
     while (1) {
-        rd_kafka_message_t* rkmsg = rd_kafka_consumer_poll(consumer, 1000);
+        rd_kafka_message_t* rkmsg = rd_kafka_consumer_poll(consumer, 1000); // 1 second timeout
+
+        // Check for termination signal here if needed
+        // For now, we'll just continue processing messages
+
         if (!rkmsg) continue;
-        
+
         if (rkmsg->err) {
+            // Handle specific errors appropriately
+            if (rkmsg->err == RD_KAFKA_RESP_ERR__TIMED_OUT) {
+                // This is expected with our timeout, continue to next iteration
+                rd_kafka_message_destroy(rkmsg);
+                continue;
+            }
+
             rd_kafka_message_destroy(rkmsg);
             continue;
         }
-        
+
         /* Parse request */
         cJSON* request = cJSON_ParseWithLength(rkmsg->payload, rkmsg->len);
         if (!request) {
             rd_kafka_message_destroy(rkmsg);
             continue;
         }
-        
+
         cJSON* target = cJSON_GetObjectItem(request, "target_service");
         if (!target || strcmp(target->valuestring, QYRO_SERVICE_NAME) != 0) {
             cJSON_Delete(request);
             rd_kafka_message_destroy(rkmsg);
             continue;
         }
-        
+
         /* Handle request */
         cJSON* func_name = cJSON_GetObjectItem(request, "function_name");
         cJSON* args = cJSON_GetObjectItem(request, "args");
         cJSON* req_id = cJSON_GetObjectItem(request, "request_id");
-        
+
         QyroRPCHandler handler = qyro_find_function(func_name->valuestring);
-        
+
         cJSON* response = cJSON_CreateObject();
         cJSON_AddStringToObject(response, "request_id", req_id->valuestring);
         cJSON_AddStringToObject(response, "source_service", QYRO_SERVICE_NAME);
         cJSON_AddNumberToObject(response, "timestamp", (double)time(NULL));
-        
+
         if (handler) {
             char* result = handler(args);
             cJSON_AddBoolToObject(response, "success", 1);
@@ -348,16 +372,16 @@ static void* qyro_rpc_server_thread(void* arg) {
             snprintf(err_msg, sizeof(err_msg), "Function '%s' not found", func_name->valuestring);
             cJSON_AddStringToObject(response, "error", err_msg);
         }
-        
+
         char* resp_str = cJSON_PrintUnformatted(response);
         qyro_publish(QYRO_RPC_RESP_TOPIC, resp_str);
-        
+
         free(resp_str);
         cJSON_Delete(response);
         cJSON_Delete(request);
         rd_kafka_message_destroy(rkmsg);
     }
-    
+
     rd_kafka_destroy(consumer);
     return NULL;
 }

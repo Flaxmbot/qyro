@@ -1,10 +1,12 @@
 /**
  * Qyro JavaScript Adapter v2 - Enhanced with RPC Support
- * 
+ *
  * Provides the Qyro API for Node.js/JavaScript services:
  * - Shared state (Redis)
  * - Event streaming (Kafka)
  * - Cross-language RPC
+ *
+ * For detailed usage examples, visit: https://qyro.dev/docs/js-adapter
  */
 
 const Redis = require("ioredis");

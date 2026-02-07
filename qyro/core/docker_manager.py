@@ -241,8 +241,59 @@ class DockerManager:
             import shutil
             shutil.rmtree(build_context)
 
-    def run_compose(self, file: str = "docker-compose.yml", detach: bool = True):
-        cmd = ["docker-compose", "-f", file, "up", "--build", "--remove-orphans"]
+    def build_services(self, file: str = "docker-compose.yml", no_cache: bool = False):
+        """Build services using docker-compose."""
+        cmd = ["docker-compose", "-f", file, "build"]
+        if no_cache:
+            cmd.append("--no-cache")
+            console.print(f"\n[bold blue]🔨 Building services (no cache)...[/bold blue]")
+        else:
+            console.print(f"\n[bold blue]🔨 Building services...[/bold blue]")
+
+        try:
+            # We use subprocess because docker-py compose support is limited/complex
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout for build logs
+                universal_newlines=True,
+                bufsize=1  # Line buffered
+            )
+
+            # Stream output with styling
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                
+                if line:
+                    line = line.strip()
+                    if not line: continue
+                    
+                    if "Building" in line or "Step" in line:
+                        console.print(f"[yellow]{line}[/yellow]")
+                    elif "Successfully" in line:
+                        console.print(f"[green]✓ {line}[/green]")
+                    elif "Error" in line or "Failed" in line:
+                        console.print(f"[red]✗ {line}[/red]")
+                    else:
+                        console.print(f"[dim]{line}[/dim]")
+
+            if process.returncode == 0:
+                console.print("\n[bold green]✓ Build complete![/]")
+                return True
+            else:
+                console.print("\n[bold red]✗ Build failed.[/]")
+                return False
+                
+        except Exception as e:
+            console.print(f"\n[bold red]✗ Error running build:[/] {e}")
+            return False
+
+    def run_compose(self, file: str = "docker-compose.yml", detach: bool = True, build: bool = True):
+        cmd = ["docker-compose", "-f", file, "up", "--remove-orphans"]
+        if build:
+            cmd.append("--build")
         if detach:
             cmd.append("-d")
 
@@ -256,15 +307,23 @@ class DockerManager:
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout for build logs
+                universal_newlines=True,
+                bufsize=1  # Line buffered
             )
 
             # Stream output with styling
             console.print("\n[bold blue]Service output:[/bold blue]")
-            for line in process.stdout:
-                line = line.strip()
+            
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                
                 if line:
+                    line = line.strip()
+                    if not line: continue
+                    
                     if "Pulling" in line or "Downloading" in line:
                         console.print(f"[cyan]{line}[/cyan]")
                     elif "Building" in line or "Step" in line:
@@ -275,13 +334,7 @@ class DockerManager:
                         console.print(f"[red]✗ {line}[/red]")
                     else:
                         console.print(line)
-                        
-            for line in process.stderr:
-                line = line.strip()
-                if line:
-                    console.print(f"[dim red]⚠️ {line}[/dim red]")
 
-            process.wait()
             if process.returncode == 0:
                 console.print("\n[bold green]✅ Services started successfully![/]")
                 return True

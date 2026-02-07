@@ -5,6 +5,8 @@ This module provides the Qyro API for Python services, including:
 - Shared state (Redis)
 - Event streaming (Kafka)
 - Cross-language RPC (@expose decorator)
+
+For detailed usage examples, visit: https://qyro.dev/docs/python-adapter
 """
 
 import os
@@ -30,12 +32,18 @@ def _get_redis():
     """Lazy-load Redis connection."""
     global _redis
     if _redis is None:
-        import redis
-        _redis = redis.Redis(
-            host=REDIS_HOST, 
-            port=REDIS_PORT, 
-            decode_responses=True
-        )
+        try:
+            import redis
+            _redis = redis.Redis(
+                host=REDIS_HOST,
+                port=REDIS_PORT,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True
+            )
+        except ImportError:
+            raise RuntimeError("Redis support requires the 'redis' package. Install with: pip install redis")
     return _redis
 
 
@@ -43,11 +51,16 @@ def _get_producer():
     """Lazy-load Kafka producer."""
     global _producer
     if _producer is None:
-        from kafka import KafkaProducer
-        _producer = KafkaProducer(
-            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-            value_serializer=lambda v: json.dumps(v).encode('utf-8')
-        )
+        try:
+            from kafka import KafkaProducer
+            _producer = KafkaProducer(
+                bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+                value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                request_timeout_ms=30000,
+                max_block_ms=5000
+            )
+        except ImportError:
+            raise RuntimeError("Kafka support requires the 'kafka-python' package. Install with: pip install kafka-python")
     return _producer
 
 
@@ -176,31 +189,41 @@ def publish(topic: str, message: dict) -> None:
 def subscribe(topic: str, group_id: str = None) -> Generator[dict, None, None]:
     """
     Subscribe to a topic and yield messages (Kafka).
-    
+
     Args:
         topic: The topic to subscribe to
         group_id: Consumer group ID (optional)
-        
+
     Yields:
         dict: Each message from the topic
-        
+
     Example:
         for message in qyro.subscribe("orders"):
             print(f"Received: {message}")
     """
-    from kafka import KafkaConsumer
-    
+    try:
+        from kafka import KafkaConsumer
+    except ImportError:
+        raise RuntimeError("Kafka support requires the 'kafka-python' package. Install with: pip install kafka-python")
+
     consumer = KafkaConsumer(
         topic,
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         auto_offset_reset='earliest',
         enable_auto_commit=True,
         group_id=group_id or f"qyro-{SERVICE_NAME}",
-        value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+        consumer_timeout_ms=10000  # Prevent indefinite blocking
     )
-    
-    for message in consumer:
-        yield message.value
+
+    try:
+        for message in consumer:
+            yield message.value
+    except Exception as e:
+        error(f"Error in Kafka subscription: {str(e)}")
+        raise
+    finally:
+        consumer.close()
 
 
 # =============================================================================

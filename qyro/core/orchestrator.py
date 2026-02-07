@@ -46,7 +46,7 @@ class Orchestrator:
         
         return qyro_files[0]
     
-    def parse_and_generate_artifacts(self) -> List[ServiceBlock]:
+    def parse_and_generate_artifacts(self, prod: bool = False) -> List[ServiceBlock]:
         """Parse the .qyro file and generate language-specific artifacts."""
         with Progress(
             SpinnerColumn(),
@@ -58,7 +58,7 @@ class Orchestrator:
             progress.update(task1, completed=1)
             
             task2 = progress.add_task("Generating language-specific artifacts...", total=1)
-            services_config = self.parser.generate_artifacts(self.project_root)
+            services_config = self.parser.generate_artifacts(self.project_root, prod=prod)
             progress.update(task2, completed=1)
             
             task3 = progress.add_task("Creating docker-compose.yml...", total=1)
@@ -107,17 +107,33 @@ class Orchestrator:
             
         console.print("[bold green]✓ Base images ready[/]")
     
-    def start_services(self, detach: bool = True):
+    def build_services(self, no_cache: bool = False):
+        """Build the application services."""
+        # Change to project directory
+        original_dir = os.getcwd()
+        os.chdir(self.project_root)
+        try:
+            return self.docker_manager.build_services(no_cache=no_cache)
+        finally:
+            os.chdir(original_dir)
+
+    def start_services(self, detach: bool = True, no_cache: bool = False):
         """Start all services in the correct order."""
         # Change to project directory to run docker-compose
         original_dir = os.getcwd()
         os.chdir(self.project_root)
         
         try:
+            # If no_cache is requested, build explicitly first
+            if no_cache:
+                console.print("[bold yellow]Rebuilding dependencies with --no-cache...[/]")
+                if not self.docker_manager.build_services(no_cache=True):
+                    raise Exception("Failed to build services")
+                    
             console.print(f"[blue]Starting services from: {self.project_root}[/]")
             
-            # Start services using docker-compose
-            if not self.docker_manager.run_compose(detach=detach):
+            # Start services (skip implicit build if we just built it)
+            if not self.docker_manager.run_compose(detach=detach, build=not no_cache):
                 raise Exception("Failed to start services")
                 
             if detach:
@@ -189,6 +205,42 @@ class Orchestrator:
         finally:
             os.chdir(original_dir)
             
+    def start_watching(self):
+        """Start watching for changes and reload services."""
+        from qyro.core.watcher import QyroWatcher
+        
+        def _on_file_changed():
+            console.print(f"\n[bold yellow]🔄 Detected change in {self.qyro_file.name}. Reloading...[/]")
+            try:
+                # Re-parse and regenerate
+                self.parse_and_generate_artifacts()
+                self.resolve_dependencies()
+                
+                # Check if we need to rebuild base images? Maybe not for simple code changes.
+                # Just restart services with build
+                console.print("[dim]Updating running services...[/]")
+                if not self.docker_manager.run_compose(detach=True, build=True):
+                    console.print("[red]Failed to restart services[/]")
+                else:
+                    console.print("[bold green]✅ Reload complete![/]")
+                    # Update displayed URLs in case ports changed
+                    self._display_service_urls()
+                    
+            except Exception as e:
+                console.print(f"[bold red]✗ Error reloading:[/bold red] {e}")
+
+        # Start watcher
+        watcher = QyroWatcher(self.qyro_file, _on_file_changed)
+        watcher.start()
+        
+        try:
+            import time
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            watcher.stop()
+            console.print("\n[yellow]Stopping watcher...[/]")
+
     def stream_logs(self, service: str = None, follow: bool = True, tail: int = 100):
         """Stream logs from services."""
         original_dir = os.getcwd()

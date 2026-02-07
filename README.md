@@ -1,130 +1,212 @@
-# Qyro 🌀
+# Qyro 1.0.0 🌀
 
 **The Universal Polyglot Runtime for SaaS**
 
-Qyro is a minimalist runtime that lets you build polyglot distributed systems in a single file. It orchestrates Python, Rust, Java, Node.js, and Web components using Docker, with shared state (Redis) and event streaming (Kafka) built-in.
+[![PyPI version](https://badge.fury.io/py/qyro.svg)](https://badge.fury.io/py/qyro)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+[![VS Code Extension](https://img.shields.io/badge/vscode-extension-blue.svg)]()
+
+> **Build distributed systems in a single file.** 
+> Qyro orchestrates Python, Rust, Java, Go, C++, and Node.js components using Docker, with shared state and event streaming built-in.
 
 ---
 
-## 🚀 Features
+## 🏗 Architecture
 
-*   **Single-File Microservices**: Define your entire stack in one `.qyro` file.
-*   **Polyglot**: Support for Python, Rust, Java, Node.js/Web.
-*   **Shared State**: Built-in `qyro.get()` and `qyro.set()` backed by Redis.
-*   **Event Driven**: Built-in `qyro.publish()` and `qyro.subscribe()` backed by Kafka.
-*   **SaaS CLI**: Beautiful, interactive terminal interface.
-*   **VS Code Support**: Syntax highlighting for embedded languages.
+```mermaid
+graph TD
+    User[Developer] -->|.qyro file| CLI[Qyro CLI]
+    CLI -->|Parses| Parser
+    Parser -->|Generates| Docker[Docker Compose]
+    
+    subgraph "Runtime Environment (Docker Network)"
+        Redis[(Redis Shared State)]
+        Kafka[(Kafka Event Bus)]
+        
+        S1[Python Service] <--> Redis
+        S1 <--> Kafka
+        
+        S2[Rust Service] <--> Redis
+        S2 <--> Kafka
+        
+        S3[Web Frontend] -->|API Calls| S1
+        S3 -->|API Calls| S2
+    end
+    
+    Docker -->|Orchestrates| S1
+    Docker -->|Orchestrates| S2
+    Docker -->|Orchestrates| S3
+```
+
+---
+
+## 🚀 Key Features
+
+*   **📝 Single-File Logic**: Define your entire stack (frontend, backend, workers) in one `.qyro` file.
+*   **🌍 True Polyglot**: First-class support for **Python, Rust, Java, Go, C/C++, and Node.js**.
+*   **🔗 Cross-Language RPC**: Call functions across languages as if they were local.
+    ```python
+    # Python calling Rust
+    result = qyro.call("rust-service.process_data", data)
+    ```
+*   **💾 Distributed State**: Built-in primitives for shared memory (`qyro.get/set`) backed by Redis.
+*   **📡 Event Streaming**: Built-in Pub/Sub (`qyro.publish/subscribe`) backed by Kafka.
+*   **🔥 Hot Reload**: Modify your `.qyro` file and see changes instantly with `qyro run --watch`.
+*   **⚡ Production Ready**: Multi-stage builds (`--prod`), image caching, and circuit breakers.
+*   **💻 Developer Experience**: Beautiful CLI logs, VS Code extension, and automatic port management.
 
 ---
 
 ## 📦 Installation
 
 ```bash
-pip install .
+pip install qyro
 ```
 
-Dependencies:
-*   Docker Desktop (must be running)
-*   Python 3.9+
+**Prerequisites:**
+*   **Docker Desktop** (Must be running)
+*   **Python 3.9+**
 
 ---
 
-## 🛠 Usage
+## ⚡ Quick Start
 
 ### 1. Initialize a Project
-
 ```bash
 qyro init myapp
 cd myapp
 ```
 
-### 2. Define Services (`myapp.qyro`)
-
+### 2. Define Your Architecture (`myapp.qyro`)
 ```python
 >>>web:frontend [react, axios]
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { call } from './qyro_adapters/js_adapter';
 
 export default function App() {
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState("Loading...");
+  
   useEffect(() => {
-    axios.get("http://localhost:8000/").then(r => setMsg(r.data.message));
+    // Call Python function from React
+    call("api.hello", "World").then(setMsg);
   }, []);
+  
   return <h1>{msg}</h1>;
 }
 
->>>python:api [fastapi, uvicorn]
-from fastapi import FastAPI
-import qyro_adapters.python_adapter as qyro
+>>>python:api [fastapi]
+from qyro_adapters.python_adapter import expose
 
-app = FastAPI()
-
-@app.get("/")
-def root():
-    # Use shared memory
-    count = qyro.get("count") or 0
-    qyro.set("count", int(count) + 1)
-    return {"message": f"Hello from Python! Count: {count}"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@expose
+def hello(name: str):
+    return f"Hello {name} from Python 🐍"
 ```
 
-### 3. Run
-
+### 3. Run It
 ```bash
-qyro run myapp.qyro
+qyro run myapp.qyro --watch
 ```
-
-This will:
-1.  Parse the `.qyro` file.
-2.  Generate Dockerfiles, `docker-compose.yml`, and dependency manifests.
-3.  Start Redis, Kafka, and your services.
-4.  Stream logs to your terminal.
+Qyro will compile your code into Docker containers, set up networking, start Redis/Kafka, and launch your app.
 
 ---
 
-## 🧩 Language Support
+## 📚 Language Support
 
-### Python
-*   **Header**: `>>>python:name [pip-deps]`
-*   **Adapter**: `import qyro_adapters.python_adapter as qyro`
+Qyro injects language-specific adapters into every container, giving you a unified API.
 
-### Web (React/Next.js)
-*   **Header**: `>>>web:name [npm-deps]`
-*   **Adapter**: `import qyro from './qyro_adapters/js_adapter'` (if needed)
-*   **Ports**: Automatically exposed on `3000`.
+### 🐍 Python
+**Header**: `>>>python:name [pip-packages]`
+```python
+from qyro_adapters.python_adapter import expose, call, get, set
 
-### Rust
-*   **Header**: `>>>rust:name [crate-deps]`
-*   **Adapter**: `mod qyro;` (injected helper)
+@expose
+def add(a: int, b: int) -> int:
+    return a + b
+```
 
-### Java
-*   **Header**: `>>>java:name [maven-deps]`
-*   **Adapter**: `com.qyro.adapters.Qyro`
+### 🦀 Rust
+**Header**: `>>>rust:name [crate-dependencies]`
+```rust
+use qyro_adapters::Qyro;
+
+Qyro::expose("add", |args| {
+    // ... implementation
+});
+```
+
+### ☕ Java
+**Header**: `>>>java:name [maven-dependencies]`
+```java
+import com.qyro.adapters.Qyro;
+
+Qyro.expose("add", args -> {
+    return args.get(0) + args.get(1);
+});
+```
+
+### 🐹 Go
+**Header**: `>>>go:name [go-modules]`
+```go
+import "qyro/adapters"
+
+adapters.Expose("add", func(args []interface{}) interface{} {
+    return args[0].(int) + args[1].(int)
+})
+```
+
+### 🕸️ Web (React/Next.js)
+**Header**: `>>>web:name [npm-packages]`
+```javascript
+import { call } from './qyro_adapters/js_adapter';
+
+await call("service.function", args);
+```
+
+---
+
+## 🛠 Advanced Usage
+
+### Hot Reloading
+Watch for file changes and auto-restart services:
+```bash
+qyro run myapp.qyro --watch
+```
+
+### Production Builds
+Create optimized, multi-stage Docker images for deployment:
+```bash
+qyro build myapp.qyro --prod
+```
+
+### Manual Build Control
+Force a rebuild without using cache:
+```bash
+qyro build --no-cache
+```
 
 ---
 
 ## 💻 VS Code Extension
 
-1.  Open `vscode_extension/` folder.
-2.  Run/Debug to install the extension.
-3.  Enjoy syntax highlighting for all embedded languages!
+For the best experience, use the **Qyro VS Code Extension**.
 
----
+1.  Navigate to `vscode_extension/` in the repo.
+2.  Install dependencies: `npm install`
+3.  Package: `vsce package`
+4.  Install `.vsix` in VS Code.
 
-## 🏗 Architecture
-
-Qyro v3 compiles your intent into standard infrastructure:
-
-*   **Orchestration**: Docker Compose
-*   **State**: Redis (Shared Key-Value)
-*   **Messaging**: Kafka (Pub/Sub)
-*   **Networking**: Internal Docker bridge network `qyro-net`
+**Features:**
+*   Syntax highlighting for mixed languages embedded in `.qyro`.
+*   Snippets for quick service generation (`>>>python`, `>>>rust`, etc.).
+*   Intellisense for Qyro headers.
 
 ---
 
 ## 📄 License
 
-MIT
+MIT © 2024 Qyro Team
+
+<p align="center">
+  Generated with ❤️ by Antigravity
+</p>

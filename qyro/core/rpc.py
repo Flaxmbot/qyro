@@ -157,6 +157,38 @@ def expose(func: F = None, *, name: str = None) -> F:
     return decorator
 
 
+
+class CircuitBreaker:
+    """Simple circuit breaker for RPC calls."""
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 30.0):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failures = 0
+        self.last_failure_time = 0
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+
+    def allow_request(self) -> bool:
+        if self.state == "CLOSED":
+            return True
+        if self.state == "OPEN":
+            if time.time() - self.last_failure_time > self.recovery_timeout:
+                self.state = "HALF_OPEN"
+                return True
+            return False
+        return True
+
+    def record_success(self):
+        self.failures = 0
+        self.state = "CLOSED"
+
+    def record_failure(self):
+        self.failures += 1
+        self.last_failure_time = time.time()
+        if self.failures >= self.failure_threshold:
+            self.state = "OPEN"
+            print(f"[Qyro RPC] Circuit breaker OPEN for service (failures={self.failures})")
+
+
 class RPCClient:
     """
     Client for making RPC calls to other services.
@@ -171,14 +203,21 @@ class RPCClient:
     _executor: ThreadPoolExecutor = None
     _listener_thread: threading.Thread = None
     _running: bool = False
+    _breakers: Dict[str, CircuitBreaker] = {}
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._pending_requests = {}
             cls._instance._running = False
+            cls._instance._breakers = {}
         return cls._instance
     
+    def _get_breaker(self, service_name: str) -> CircuitBreaker:
+        if service_name not in self._breakers:
+            self._breakers[service_name] = CircuitBreaker()
+        return self._breakers[service_name]
+
     def _ensure_initialized(self):
         """Lazy initialization of Kafka connections."""
         if self._producer is not None:
@@ -229,9 +268,15 @@ class RPCClient:
                             if response.request_id in self._pending_requests:
                                 future = self._pending_requests.pop(response.request_id)
                                 
+                                # Update breaker stats
+                                breaker = self._get_breaker(response.source_service)
                                 if response.success:
+                                    breaker.record_success()
                                     future.set_result(response.result)
                                 else:
+                                    # Application error is not necessarily a service failure
+                                    # But we count it as success in terms of connectivity
+                                    breaker.record_success() 
                                     future.set_exception(
                                         RuntimeError(f"RPC Error: {response.error}")
                                     )
@@ -248,19 +293,6 @@ class RPCClient:
     def call(self, function_path: str, *args, timeout: float = None, **kwargs) -> Any:
         """
         Call a remote function.
-        
-        Args:
-            function_path: Full path like "service-name.function_name"
-            *args: Positional arguments
-            timeout: Override default timeout
-            **kwargs: Keyword arguments
-            
-        Returns:
-            The result of the remote function call
-            
-        Raises:
-            TimeoutError: If the call times out
-            RuntimeError: If the remote function raises an error
         """
         self._ensure_initialized()
         
@@ -273,6 +305,11 @@ class RPCClient:
             )
         
         target_service, function_name = parts
+        
+        # Check circuit breaker
+        breaker = self._get_breaker(target_service)
+        if not breaker.allow_request():
+            raise RuntimeError(f"Circuit breaker OPEN for service '{target_service}'")
         
         # Create request
         request = RPCRequest(
@@ -290,14 +327,19 @@ class RPCClient:
         self._pending_requests[request.request_id] = future
         
         # Send request
-        self._producer.send(RPC_TOPIC, request.to_json())
-        self._producer.flush()
+        try:
+            self._producer.send(RPC_TOPIC, request.to_json())
+            self._producer.flush()
+        except Exception as e:
+            breaker.record_failure()
+            raise e
         
         # Wait for response
         try:
             return future.result(timeout=timeout or RPC_TIMEOUT)
         except TimeoutError:
             self._pending_requests.pop(request.request_id, None)
+            breaker.record_failure()
             raise TimeoutError(
                 f"RPC call to '{function_path}' timed out after {timeout or RPC_TIMEOUT}s"
             )

@@ -16,11 +16,17 @@ class ServiceBlock(BaseModel):
 
 class QyroParser:
     # Support both old syntax (>>>) and new syntax (language:component [dependencies])
-    BLOCK_REGEX = re.compile(r"^(?:>>>)?(?P<lang>\w+):(?P<name>[\w-]+)(?:\s*\[(?P<deps>.*)\])?")
+    BLOCK_REGEX = re.compile(r"^(?:>>>)?(?P<lang>\w+):(?P<name>[\w-]+)(?:\s*\[(?P<deps>[^\]]*)\])?")
+
+    # Valid language identifiers
+    VALID_LANGUAGES = {
+        'python', 'web', 'js', 'ts', 'react', 'next', 'rust', 'java',
+        'go', 'golang', 'c', 'cpp', 'c++'
+    }
 
     def __init__(self, filepath: str):
         self.filepath = Path(filepath)
-        self.content = self.filepath.read_text()
+        self.content = self.filepath.read_text(encoding='utf-8')
         self.services: List[ServiceBlock] = []
 
     def parse(self):
@@ -36,10 +42,24 @@ class QyroParser:
                     self.services.append(current_block)
                     buffer = []
 
-                lang = match.group("lang")
+                lang = match.group("lang").lower()
                 name = match.group("name")
                 deps_str = match.group("deps")
+
+                # Validate language
+                if lang not in self.VALID_LANGUAGES:
+                    raise ValueError(f"Unsupported language: {lang} at line {i + 1}")
+
+                # Validate name (should be alphanumeric with hyphens/underscores)
+                if not re.match(r'^[\w-]+$', name):
+                    raise ValueError(f"Invalid service name: {name} at line {i + 1}. Names must contain only letters, numbers, hyphens, and underscores.")
+
                 deps = [d.strip() for d in deps_str.split(",") if d.strip()] if deps_str else []
+
+                # Validate dependencies (basic validation)
+                for dep in deps:
+                    if not re.match(r'^[\w.-]+$', dep):
+                        raise ValueError(f"Invalid dependency name: {dep} at line {i + 1}")
 
                 current_block = ServiceBlock(
                     language=lang,
@@ -58,7 +78,7 @@ class QyroParser:
 
         return self.services
 
-    def generate_artifacts(self, output_dir: Path):
+    def generate_artifacts(self, output_dir: Path, prod: bool = False):
         output_dir.mkdir(parents=True, exist_ok=True)
         services_config = []
 
@@ -70,10 +90,10 @@ class QyroParser:
             self._copy_adapters(service_dir)
 
             if service.language == "python":
-                self._generate_python(service, service_dir)
+                self._generate_python(service, service_dir, prod=prod)
                 services_config.append(self._get_docker_config(service, "python"))
             elif service.language in ["web", "js", "ts"]:
-                self._generate_web(service, service_dir)
+                self._generate_web(service, service_dir, prod=prod)
                 services_config.append(self._get_docker_config(service, "node"))
             elif service.language == "rust":
                 self._generate_rust(service, service_dir)
@@ -100,20 +120,21 @@ class QyroParser:
             shutil.rmtree(adapters_dest)
         shutil.copytree(adapters_src, adapters_dest)
 
-    def _generate_python(self, service: ServiceBlock, path: Path):
-        (path / "main.py").write_text(service.content)
+    def _generate_python(self, service: ServiceBlock, path: Path, prod: bool = False):
+        (path / "main.py").write_text(service.content, encoding='utf-8')
 
         # Inject standard deps
         deps = set(service.dependencies)
         deps.update(["redis", "kafka-python", "requests"])
         reqs = "\n".join(sorted(deps))
-        (path / "requirements.txt").write_text(reqs)
+        (path / "requirements.txt").write_text(reqs, encoding='utf-8')
 
-        # Create Dockerfile using the universal template
-        dockerfile_content = DOCKERFILE_UNIVERSAL_PYTHON.format(filename="main.py")
-        (path / "Dockerfile").write_text(dockerfile_content)
+        # Create Dockerfile using the universal template or prod
+        template = DOCKERFILE_PYTHON_PROD if prod else DOCKERFILE_UNIVERSAL_PYTHON
+        dockerfile_content = template.format(filename="main.py")
+        (path / "Dockerfile").write_text(dockerfile_content, encoding='utf-8')
 
-    def _generate_web(self, service: ServiceBlock, path: Path):
+    def _generate_web(self, service: ServiceBlock, path: Path, prod: bool = False):
         is_next = "next" in service.dependencies
 
         deps_dict = {d: "*" for d in service.dependencies}
@@ -142,22 +163,22 @@ class QyroParser:
                 "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
             }
         }
-        (path / "package.json").write_text(json.dumps(pkg, indent=2))
+        (path / "package.json").write_text(json.dumps(pkg, indent=2), encoding='utf-8')
 
         if is_next:
             (path / "pages").mkdir(exist_ok=True)
-            (path / "pages" / "index.js").write_text(service.content)
+            (path / "pages" / "index.js").write_text(service.content, encoding='utf-8')
         else:
             (path / "src").mkdir(exist_ok=True)
             (path / "public").mkdir(exist_ok=True)
-            (path / "src" / "App.js").write_text(service.content)
+            (path / "src" / "App.js").write_text(service.content, encoding='utf-8')
             (path / "src" / "index.js").write_text("""
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
-""")
+""", encoding='utf-8')
             (path / "public" / "index.html").write_text("""
 <!DOCTYPE html>
 <html lang="en">
@@ -165,6 +186,11 @@ root.render(<App />);
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Qyro App</title>
+    <style>
+      body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+      code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace; }
+      * { box-sizing: border-box; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
@@ -172,20 +198,29 @@ root.render(<App />);
 </html>
 """)
 
-        # Create Dockerfile using the universal template
-        dockerfile_content = DOCKERFILE_UNIVERSAL_NODE
+        # Create Dockerfile using the universal template or prod
+        # For Next.js we stick to universal for now as PROD template is optimized for static serving
+        use_prod = prod and not is_next
+        template = DOCKERFILE_WEB_PROD if use_prod else DOCKERFILE_UNIVERSAL_NODE
+        dockerfile_content = template
         (path / "Dockerfile").write_text(dockerfile_content)
 
     def _generate_rust(self, service: ServiceBlock, path: Path):
         deps_lines = ""
         user_deps = set(service.dependencies)
-        # Add defaults
+        # Add defaults with modern versions
         defaults = {
-            "redis": "\"0.23\"",
-            "rdkafka": "\"0.29\"",
+            "redis": "\"0.24\"",
+            "rdkafka": "{\"version\" = \"0.36\", \"features\" = [\"ssl\"]}",
             "serde": '{ version = "1.0", features = ["derive"] }',
             "serde_json": "\"1.0\"",
-            "tokio": '{ version = "1", features = ["full"] }'
+            "tokio": '{ version = "1.0", features = ["full"] }',
+            "anyhow": "\"1.0\"",
+            "dotenv": "\"0.15\"",
+            "futures": "\"0.3\"",
+            "lazy_static": "\"1.4\"",
+            "uuid": '{ version = "1.0", features = ["v4", "serde"] }',
+            "chrono": "\"0.4\""
         }
 
         for d, v in defaults.items():
@@ -193,7 +228,8 @@ root.render(<App />);
                 deps_lines += f'{d} = {v}\n'
 
         for d in user_deps:
-            deps_lines += f'{d} = "*"\n'
+            if d not in defaults:
+                deps_lines += f'{d} = "*"\n'
 
         cargo_toml = f"""
 [package]
@@ -204,14 +240,14 @@ edition = "2021"
 [dependencies]
 {deps_lines}
 """
-        (path / "Cargo.toml").write_text(cargo_toml)
+        (path / "Cargo.toml").write_text(cargo_toml, encoding='utf-8')
 
         (path / "src").mkdir(exist_ok=True)
-        (path / "src" / "main.rs").write_text(service.content)
+        (path / "src" / "main.rs").write_text(service.content, encoding='utf-8')
 
         # Create Dockerfile using the universal template
         dockerfile_content = DOCKERFILE_UNIVERSAL_RUST.format(bin_name=service.name)
-        (path / "Dockerfile").write_text(dockerfile_content)
+        (path / "Dockerfile").write_text(dockerfile_content, encoding='utf-8')
 
     def _generate_java(self, service: ServiceBlock, path: Path):
         # We need to add dependencies to pom.xml
@@ -275,12 +311,12 @@ edition = "2021"
     </build>
 </project>
 """
-        (path / "pom.xml").write_text(pom)
+        (path / "pom.xml").write_text(pom, encoding='utf-8')
 
         # Package structure com.qyro.app
         src_path = path / "src" / "main" / "java" / "com" / "qyro" / "app"
         src_path.mkdir(parents=True, exist_ok=True)
-        (src_path / "Main.java").write_text(service.content)
+        (src_path / "Main.java").write_text(service.content, encoding='utf-8')
 
         # Copy Qyro adapters to the service's source directory
         adapters_src = Path(qyro.lib.__file__).parent
@@ -292,7 +328,7 @@ edition = "2021"
 
         # Create Dockerfile using the Java-specific base image
         dockerfile_content = DOCKERFILE_JAVA
-        (path / "Dockerfile").write_text(dockerfile_content)
+        (path / "Dockerfile").write_text(dockerfile_content, encoding='utf-8')
 
     def _get_docker_config(self, service: ServiceBlock, type: str):
         # Use port manager for dynamic port assignment
@@ -372,7 +408,7 @@ edition = "2021"
 
     def _generate_go(self, service: ServiceBlock, path: Path):
         """Generate Go service artifacts."""
-        (path / "main.go").write_text(service.content)
+        (path / "main.go").write_text(service.content, encoding='utf-8')
 
         # Create go.mod
         go_mod = f"""module {service.name}
@@ -385,14 +421,14 @@ require (
     github.com/google/uuid v1.6.0
 )
 """
-        (path / "go.mod").write_text(go_mod)
+        (path / "go.mod").write_text(go_mod, encoding='utf-8')
 
         # Create Dockerfile for Go
-        dockerfile = """FROM golang:1.21-alpine
+        dockerfile = """FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Install build dependencies
 RUN apk add --no-cache gcc musl-dev
 
 COPY go.mod go.sum* ./
@@ -400,18 +436,39 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+
+# Use a minimal base image for the final stage
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /root/
+
+# Copy the binary and set permissions
+COPY --from=builder /app/main .
+
+# Create non-root user
+RUN addgroup -g 1001 -S qyro && \\
+    adduser -u 1001 -S qyro -G qyro
+
+# Change ownership to non-root user
+RUN chown -R qyro:qyro /root/
+
+# Switch to non-root user
+USER qyro
 
 CMD ["./main"]
 """
-        (path / "Dockerfile").write_text(dockerfile)
+        (path / "Dockerfile").write_text(dockerfile, encoding='utf-8')
 
     def _generate_c(self, service: ServiceBlock, path: Path):
         """Generate C/C++ service artifacts."""
         is_cpp = "cpp" in service.language or any(f.endswith(".hpp") for f in service.dependencies)
         
         ext = ".cpp" if is_cpp else ".c"
-        (path / f"main{ext}").write_text(service.content)
+        (path / f"main{ext}").write_text(service.content, encoding='utf-8')
 
         # Create CMakeLists.txt
         cmake = f"""cmake_minimum_required(VERSION 3.16)
@@ -439,10 +496,10 @@ target_link_libraries({service.name}
     pthread
 )
 """
-        (path / "CMakeLists.txt").write_text(cmake)
+        (path / "CMakeLists.txt").write_text(cmake, encoding='utf-8')
 
         # Create Dockerfile for C/C++
-        dockerfile = f"""FROM alpine:3.19
+        dockerfile = f"""FROM alpine:3.19 AS builder
 
 WORKDIR /app
 
@@ -461,7 +518,25 @@ RUN mkdir build && cd build && \\
     cmake .. && \\
     make
 
+# Use a minimal base image for the final stage
+FROM alpine:3.19
+
+WORKDIR /root/
+
+# Copy the binary
+COPY --from=builder /app/build/{service.name} .
+
+# Create non-root user
+RUN addgroup -g 1001 -S qyro && \\
+    adduser -u 1001 -S qyro -G qyro
+
+# Change ownership to non-root user
+RUN chown -R qyro:qyro /root/
+
+# Switch to non-root user
+USER qyro
+
 CMD ["./build/{service.name}"]
 """
-        (path / "Dockerfile").write_text(dockerfile)
+        (path / "Dockerfile").write_text(dockerfile, encoding='utf-8')
 

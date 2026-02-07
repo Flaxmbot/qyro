@@ -16,11 +16,13 @@ import java.lang.annotation.*;
 
 /**
  * Qyro Java Adapter v2 - Enhanced with RPC Support
- * 
+ *
  * Provides the Qyro API for Java services:
  * - Shared state (Redis)
  * - Event streaming (Kafka)
  * - Cross-language RPC
+ *
+ * For detailed usage examples, visit: https://qyro.dev/docs/java-adapter
  */
 public class Qyro {
     // Configuration

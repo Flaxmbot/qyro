@@ -304,7 +304,8 @@ def setup(
 @app.command()
 def start(
     detach: bool = typer.Option(True, "--detach", "-d", help="Run in background"),
-    file: str = typer.Option(None, "--file", "-f", help="The .qyro file to use")
+    file: str = typer.Option(None, "--file", "-f", help="The .qyro file to use"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Do not use cache when building")
 ):
     """Start the Docker containers."""
     print_banner(animate=False)
@@ -319,11 +320,11 @@ def start(
             orchestrator.parse_and_generate_artifacts()
             orchestrator.resolve_dependencies()
             orchestrator.ensure_base_images()
-            orchestrator.start_services(detach=detach)
+            orchestrator.start_services(detach=detach, no_cache=no_cache)
         else:
             orchestrator = Orchestrator(file)
             orchestrator.ensure_base_images()
-            orchestrator.start_services(detach=detach)
+            orchestrator.start_services(detach=detach, no_cache=no_cache)
             
     except FileNotFoundError as e:
         print_status(str(e), "error")
@@ -417,8 +418,53 @@ def status():
 
 
 @app.command()
+def build(
+    file: str = typer.Argument(None, help="The .qyro file to build"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Do not use cache when building"),
+    prod: bool = typer.Option(False, "--prod", help="Use production optimization")
+):
+    """Build the application services."""
+    print_banner(animate=False)
+    console.print()
+
+    try:
+        with Progress(
+            SpinnerColumn(style=COLORS["primary"]),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Building services...", total=None)
+            
+            orchestrator = Orchestrator(file)
+            
+            progress.update(task, description="Parsing .qyro file...")
+            orchestrator.parse_and_generate_artifacts(prod=prod)
+            
+            progress.update(task, description="Resolving dependencies...")
+            orchestrator.resolve_dependencies()
+            
+            progress.update(task, description="Building images...")
+            orchestrator.ensure_base_images()
+            
+            # Explicit build
+            orchestrator.build_services(no_cache=no_cache)
+            
+        console.print()
+        print_status("Build complete!", "success")
+        
+    except FileNotFoundError as e:
+        print_status(str(e), "error")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        print_status(str(e), "error")
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def run(
-    file: str = typer.Argument(None, help="The .qyro file to run")
+    file: str = typer.Argument(None, help="The .qyro file to run"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Do not use cache when building"),
+    watch: bool = typer.Option(False, "--watch", "-w", help="Watch for changes and hot reload")
 ):
     """Setup and run in one command (recommended)."""
     print_banner()
@@ -444,7 +490,7 @@ def run(
             orchestrator.ensure_base_images()
             
             progress.update(task, description="Starting services...")
-            orchestrator.start_services(detach=True)
+            orchestrator.start_services(detach=True, no_cache=no_cache)
         
         console.print()
         print_status("All services running!", "success")
@@ -461,10 +507,13 @@ def run(
             padding=(1, 2)
         ))
         
-        print_status("Press Ctrl+C to stop logs...", "info")
-        console.print()
-        
-        orchestrator.stream_logs()
+        if watch:
+            print_status("Watching for changes... (Press Ctrl+C to stop)", "info")
+            orchestrator.start_watching()
+        else:
+            print_status("Press Ctrl+C to stop logs...", "info")
+            console.print()
+            orchestrator.stream_logs()
         
     except FileNotFoundError as e:
         print_status(str(e), "error")
