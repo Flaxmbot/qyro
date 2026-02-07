@@ -1,0 +1,270 @@
+# Qyro E-Commerce Application
+# Demonstrates polyglot microservices with React, Python, Java, and Rust
+
+>>>web:frontend [react, axios]
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+const API = 'http://localhost:8000';
+
+function App() {
+  const [products, setProducts] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [view, setView] = useState('shop');
+
+  useEffect(() => { fetchProducts(); }, []);
+
+  const fetchProducts = async () => {
+    const r = await axios.get(`${API}/products`);
+    setProducts(r.data.products || []);
+  };
+
+  const addToCart = (p) => setCart([...cart, p]);
+  
+  const checkout = async () => {
+    if (cart.length === 0) return alert('Cart is empty');
+    const r = await axios.post(`${API}/orders`, { items: cart.map(p => ({ id: p.id, qty: 1 })) });
+    if (r.data.success) {
+      alert(`Order placed! ID: ${r.data.order_id}`);
+      setCart([]);
+    }
+  };
+
+  const total = cart.reduce((s, p) => s + p.price, 0);
+
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(180deg,#0f172a,#1e293b)',color:'#fff',fontFamily:'system-ui'}}>
+      <nav style={{padding:'20px 40px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid #334155'}}>
+        <h1 style={{fontSize:24}}>🛒 Qyro Shop</h1>
+        <div style={{display:'flex',gap:20}}>
+          <button onClick={()=>setView('shop')} style={{background:'none',border:'none',color:view==='shop'?'#4f46e5':'#fff',cursor:'pointer',fontSize:16}}>Shop</button>
+          <button onClick={()=>setView('cart')} style={{background:'none',border:'none',color:view==='cart'?'#4f46e5':'#fff',cursor:'pointer',fontSize:16}}>Cart ({cart.length})</button>
+        </div>
+      </nav>
+
+      {view === 'shop' ? (
+        <div style={{padding:40,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:24}}>
+          {products.map(p => (
+            <div key={p.id} style={{background:'#1e293b',borderRadius:12,padding:20,boxShadow:'0 4px 20px rgba(0,0,0,0.3)'}}>
+              <div style={{height:160,background:'linear-gradient(135deg,#4f46e5,#7c3aed)',borderRadius:8,marginBottom:16,display:'flex',alignItems:'center',justifyContent:'center',fontSize:48}}>
+                {p.emoji || '📦'}
+              </div>
+              <h3>{p.name}</h3>
+              <p style={{color:'#94a3b8',fontSize:14}}>{p.description}</p>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:16}}>
+                <span style={{fontSize:24,fontWeight:'bold'}}>${p.price}</span>
+                <button onClick={()=>addToCart(p)} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'#4f46e5',color:'#fff',cursor:'pointer'}}>Add</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{padding:40,maxWidth:600,margin:'0 auto'}}>
+          <h2>Your Cart</h2>
+          {cart.length === 0 ? <p>Cart is empty</p> : (
+            <>
+              {cart.map((p,i) => (
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:16,background:'#1e293b',borderRadius:8,marginBottom:12}}>
+                  <span>{p.name}</span>
+                  <span>${p.price}</span>
+                </div>
+              ))}
+              <div style={{borderTop:'1px solid #334155',paddingTop:20,marginTop:20}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:20,fontWeight:'bold'}}>
+                  <span>Total</span>
+                  <span>${total.toFixed(2)}</span>
+                </div>
+                <button onClick={checkout} style={{width:'100%',padding:16,marginTop:20,borderRadius:8,border:'none',background:'#22c55e',color:'#fff',fontSize:18,cursor:'pointer'}}>Checkout</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+export default App;
+
+
+>>>python:api [fastapi, uvicorn]
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List
+import time, sys, uuid
+
+sys.path.insert(0, '/app/qyro_adapters')
+from python_adapter import set, get, publish, expose, call, info, register_service
+
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# Sample products
+PRODUCTS = [
+    {"id": "1", "name": "Laptop Pro", "price": 1299.99, "emoji": "💻", "description": "High-performance laptop"},
+    {"id": "2", "name": "Wireless Mouse", "price": 49.99, "emoji": "🖱️", "description": "Ergonomic wireless mouse"},
+    {"id": "3", "name": "Mechanical Keyboard", "price": 149.99, "emoji": "⌨️", "description": "RGB mechanical keyboard"},
+    {"id": "4", "name": "4K Monitor", "price": 399.99, "emoji": "🖥️", "description": "27-inch 4K display"},
+    {"id": "5", "name": "USB-C Hub", "price": 79.99, "emoji": "🔌", "description": "Multi-port USB-C hub"},
+    {"id": "6", "name": "Webcam HD", "price": 89.99, "emoji": "📷", "description": "1080p HD webcam"},
+]
+
+class OrderItem(BaseModel):
+    id: str
+    qty: int
+
+class OrderRequest(BaseModel):
+    items: List[OrderItem]
+
+@expose
+def get_product(pid: str) -> dict:
+    return next((p for p in PRODUCTS if p["id"] == pid), None)
+
+@expose
+def calculate_total(items: list) -> float:
+    total = 0
+    for item in items:
+        p = get_product(item["id"])
+        if p:
+            total += p["price"] * item.get("qty", 1)
+    return total
+
+@app.on_event("startup")
+async def startup():
+    register_service({"type": "ecommerce-api"})
+    info("E-Commerce API started")
+
+@app.get("/products")
+async def list_products():
+    return {"products": PRODUCTS}
+
+@app.get("/products/{pid}")
+async def product(pid: str):
+    return {"product": get_product(pid)}
+
+@app.post("/orders")
+async def create_order(req: OrderRequest):
+    order_id = str(uuid.uuid4())[:8]
+    items = [i.dict() for i in req.items]
+    
+    # Call Java inventory service
+    try:
+        stock_ok = call("inventory.check_stock", items)
+        if not stock_ok.get("available"):
+            return {"success": False, "error": "Out of stock"}
+    except Exception as e:
+        info(f"Inventory check skipped: {e}")
+    
+    # Calculate total via Rust
+    try:
+        total = call("pricing.calculate", items)
+    except:
+        total = calculate_total(items)
+    
+    order = {"id": order_id, "items": items, "total": total, "status": "pending", "created": time.time()}
+    set(f"order:{order_id}", order)
+    publish("orders.created", order)
+    
+    return {"success": True, "order_id": order_id, "total": total}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+>>>java:inventory []
+package com.qyro.app;
+import com.qyro.adapters.Qyro;
+import java.util.*;
+
+public class Main {
+    static Map<String, Integer> STOCK = new HashMap<>() {{
+        put("1", 10); put("2", 50); put("3", 25);
+        put("4", 15); put("5", 100); put("6", 30);
+    }};
+    
+    public static void main(String[] args) {
+        Qyro.info("Starting Inventory Service...");
+        
+        Qyro.expose("check_stock", a -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String,Object>> items = (List<Map<String,Object>>)a[0];
+            Map<String,Object> r = new HashMap<>();
+            boolean available = true;
+            for (Map<String,Object> item : items) {
+                String id = (String)item.get("id");
+                int qty = ((Number)item.getOrDefault("qty", 1)).intValue();
+                int stock = STOCK.getOrDefault(id, 0);
+                if (stock < qty) { available = false; break; }
+            }
+            r.put("available", available);
+            return r;
+        });
+        
+        Qyro.expose("reserve_stock", a -> {
+            String id = (String)a[0];
+            int qty = ((Number)a[1]).intValue();
+            int stock = STOCK.getOrDefault(id, 0);
+            if (stock >= qty) {
+                STOCK.put(id, stock - qty);
+                return Map.of("success", true);
+            }
+            return Map.of("success", false);
+        });
+        
+        Qyro.startRPCServer();
+        Qyro.registerService(Map.of("type", "inventory"));
+        Qyro.info("Inventory ready!");
+        
+        while(true) { try { Thread.sleep(10000); } catch(Exception e) { break; } }
+    }
+}
+
+
+>>>rust:pricing []
+use serde_json::{json, Value};
+use std::collections::HashMap;
+
+mod qyro_adapters { include!("qyro_adapters/rust_adapter.rs"); }
+use qyro_adapters::Qyro;
+
+fn get_price(id: &str) -> f64 {
+    match id {
+        "1" => 1299.99, "2" => 49.99, "3" => 149.99,
+        "4" => 399.99, "5" => 79.99, "6" => 89.99,
+        _ => 0.0
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    Qyro::info("Starting Pricing Service...");
+    
+    Qyro::expose("calculate", |args: Vec<Value>| {
+        let items = args.get(0).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        let mut total = 0.0;
+        for item in items {
+            let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+            let qty = item.get("qty").and_then(|v| v.as_i64()).unwrap_or(1) as f64;
+            total += get_price(id) * qty;
+        }
+        Ok(json!(total))
+    });
+    
+    Qyro::expose("apply_discount", |args: Vec<Value>| {
+        let total = args.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let code = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
+        let discount = match code {
+            "SAVE10" => 0.10,
+            "SAVE20" => 0.20,
+            _ => 0.0
+        };
+        Ok(json!(total * (1.0 - discount)))
+    });
+    
+    Qyro::start_rpc_server().await;
+    Qyro::register_service(None);
+    Qyro::info("Pricing ready!");
+    
+    loop { tokio::time::sleep(tokio::time::Duration::from_secs(10)).await; }
+}

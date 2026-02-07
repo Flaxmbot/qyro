@@ -1,0 +1,174 @@
+{
+    "Python Service": {
+        "prefix": ">>>python",
+        "body": [
+            ">>>python:${1:service-name} [${2:fastapi, uvicorn}]",
+            "from fastapi import FastAPI",
+            "import sys",
+            "sys.path.insert(0, '/app/qyro_adapters')",
+            "from python_adapter import set, get, expose, call, info",
+            "",
+            "app = FastAPI()",
+            "",
+            "@expose",
+            "def ${3:my_function}(${4:args}):",
+            "    ${5:pass}",
+            "",
+            "@app.get('/')",
+            "def root():",
+            "    return {'message': 'Hello from Qyro!'}",
+            "",
+            "if __name__ == '__main__':",
+            "    import uvicorn",
+            "    uvicorn.run(app, host='0.0.0.0', port=8000)"
+        ],
+        "description": "Create a Python service with FastAPI"
+    },
+    "Web Frontend": {
+        "prefix": ">>>web",
+        "body": [
+            ">>>web:${1:frontend} [react, axios]",
+            "import React, { useState, useEffect } from 'react';",
+            "import axios from 'axios';",
+            "",
+            "function App() {",
+            "  const [data, setData] = useState(null);",
+            "",
+            "  useEffect(() => {",
+            "    axios.get('http://localhost:8000/')",
+            "      .then(r => setData(r.data))",
+            "      .catch(console.error);",
+            "  }, []);",
+            "",
+            "  return (",
+            "    <div>",
+            "      <h1>🌀 Qyro App</h1>",
+            "      <pre>{JSON.stringify(data, null, 2)}</pre>",
+            "    </div>",
+            "  );",
+            "}",
+            "export default App;"
+        ],
+        "description": "Create a React frontend service"
+    },
+    "Rust Service": {
+        "prefix": ">>>rust",
+        "body": [
+            ">>>rust:${1:service-name} []",
+            "use serde_json::{json, Value};",
+            "",
+            "mod qyro_adapters {",
+            "    include!(\"qyro_adapters/rust_adapter.rs\");",
+            "}",
+            "use qyro_adapters::Qyro;",
+            "",
+            "#[tokio::main]",
+            "async fn main() {",
+            "    Qyro::info(\"Starting ${1} service...\");",
+            "    ",
+            "    Qyro::expose(\"${2:my_function}\", |args: Vec<Value>| {",
+            "        ${3:Ok(json!(\"result\"))}",
+            "    });",
+            "    ",
+            "    Qyro::start_rpc_server().await;",
+            "    Qyro::register_service(None);",
+            "    ",
+            "    loop {",
+            "        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;",
+            "    }",
+            "}"
+        ],
+        "description": "Create a Rust service"
+    },
+    "Java Service": {
+        "prefix": ">>>java",
+        "body": [
+            ">>>java:${1:service-name} []",
+            "package com.qyro.app;",
+            "import com.qyro.adapters.Qyro;",
+            "import java.util.*;",
+            "",
+            "public class Main {",
+            "    public static void main(String[] args) {",
+            "        Qyro.info(\"Starting ${1} service...\");",
+            "        ",
+            "        Qyro.expose(\"${2:my_function}\", a -> {",
+            "            ${3:return Map.of(\"result\", \"ok\");}",
+            "        });",
+            "        ",
+            "        Qyro.startRPCServer();",
+            "        Qyro.registerService(null);",
+            "        ",
+            "        while(true) {",
+            "            try { Thread.sleep(10000); }",
+            "            catch(Exception e) { break; }",
+            "        }",
+            "    }",
+            "}"
+        ],
+        "description": "Create a Java service"
+    },
+    "Go Service": {
+        "prefix": ">>>go",
+        "body": [
+            ">>>go:${1:service-name} []",
+            "package main",
+            "",
+            "import qyro \"./qyro_adapters\"",
+            "",
+            "func main() {",
+            "    qyro.Info(\"Starting ${1} service...\")",
+            "    ",
+            "    qyro.Expose(\"${2:my_function}\", func(args []interface{}) (interface{}, error) {",
+            "        ${3:return map[string]string{\"result\": \"ok\"}, nil}",
+            "    })",
+            "    ",
+            "    qyro.StartRPCServer()",
+            "    qyro.RegisterService(nil)",
+            "    ",
+            "    select {}",
+            "}"
+        ],
+        "description": "Create a Go service"
+    },
+    "C Service": {
+        "prefix": ">>>c",
+        "body": [
+            ">>>c:${1:service-name} []",
+            "#include \"qyro_adapters/c_adapter.h\"",
+            "",
+            "char* ${2:my_function}(cJSON* args) {",
+            "    ${3:return strdup(\"{\\\"result\\\": \\\"ok\\\"}\");}",
+            "}",
+            "",
+            "int main() {",
+            "    qyro_init();",
+            "    qyro_info(\"Starting ${1} service...\");",
+            "    ",
+            "    qyro_expose(\"${2}\", ${2});",
+            "    qyro_start_rpc_server();",
+            "    qyro_register_service();",
+            "    ",
+            "    while(1) { sleep(10); }",
+            "    return 0;",
+            "}"
+        ],
+        "description": "Create a C service"
+    },
+    "RPC Call": {
+        "prefix": "qyro-call",
+        "body": [
+            "result = call(\"${1:service}.${2:function}\", ${3:args})"
+        ],
+        "description": "Call a remote function via RPC"
+    },
+    "Expose Function": {
+        "prefix": "qyro-expose",
+        "body": [
+            "@expose",
+            "def ${1:function_name}(${2:args}):",
+            "    ${3:pass}"
+        ],
+        "description": "Expose a function for RPC"
+    }
+}

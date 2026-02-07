@@ -1,5 +1,0 @@
-fastapi
-kafka-python
-redis
-requests
-uvicorn

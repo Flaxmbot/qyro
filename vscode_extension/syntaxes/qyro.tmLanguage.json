@@ -1,71 +1,199 @@
 {
     "scopeName": "source.qyro",
+    "name": "Qyro",
     "patterns": [
+        {
+            "include": "#comments"
+        },
         {
             "include": "#blocks"
         }
     ],
     "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "match": "^#.*$",
+                    "name": "comment.line.hash.qyro"
+                }
+            ]
+        },
         "blocks": {
             "patterns": [
-                { "include": "#python-block" },
-                { "include": "#js-block" },
-                { "include": "#rust-block" },
-                { "include": "#java-block" }
+                {
+                    "include": "#python-block"
+                },
+                {
+                    "include": "#js-block"
+                },
+                {
+                    "include": "#rust-block"
+                },
+                {
+                    "include": "#java-block"
+                },
+                {
+                    "include": "#go-block"
+                },
+                {
+                    "include": "#c-block"
+                },
+                {
+                    "include": "#cpp-block"
+                }
             ]
         },
         "python-block": {
             "begin": "^>>>(python):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
             "beginCaptures": {
-                "1": { "name": "keyword.control.qyro" },
-                "2": { "name": "entity.name.function.qyro" },
-                "3": { "name": "string.quoted.qyro" }
+                "1": {
+                    "name": "keyword.control.qyro"
+                },
+                "2": {
+                    "name": "entity.name.function.qyro"
+                },
+                "3": {
+                    "name": "string.quoted.qyro"
+                }
             },
             "end": "(?=^>>>)",
             "contentName": "source.python",
             "patterns": [
-                { "include": "source.python" }
+                {
+                    "include": "source.python"
+                }
             ]
         },
         "js-block": {
             "begin": "^>>>(web|js|ts|react|next):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
-             "beginCaptures": {
-                "1": { "name": "keyword.control.qyro" },
-                "2": { "name": "entity.name.function.qyro" },
-                "3": { "name": "string.quoted.qyro" }
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.qyro"
+                },
+                "2": {
+                    "name": "entity.name.function.qyro"
+                },
+                "3": {
+                    "name": "string.quoted.qyro"
+                }
             },
             "end": "(?=^>>>)",
             "contentName": "source.tsx",
             "patterns": [
-                { "include": "source.tsx" },
-                { "include": "source.ts" },
-                { "include": "source.js" }
+                {
+                    "include": "source.tsx"
+                },
+                {
+                    "include": "source.ts"
+                },
+                {
+                    "include": "source.js"
+                }
             ]
         },
         "rust-block": {
             "begin": "^>>>(rust):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
-             "beginCaptures": {
-                "1": { "name": "keyword.control.qyro" },
-                "2": { "name": "entity.name.function.qyro" },
-                "3": { "name": "string.quoted.qyro" }
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.qyro"
+                },
+                "2": {
+                    "name": "entity.name.function.qyro"
+                },
+                "3": {
+                    "name": "string.quoted.qyro"
+                }
             },
             "end": "(?=^>>>)",
             "contentName": "source.rust",
             "patterns": [
-                { "include": "source.rust" }
+                {
+                    "include": "source.rust"
+                }
             ]
         },
         "java-block": {
             "begin": "^>>>(java):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
-             "beginCaptures": {
-                "1": { "name": "keyword.control.qyro" },
-                "2": { "name": "entity.name.function.qyro" },
-                "3": { "name": "string.quoted.qyro" }
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.qyro"
+                },
+                "2": {
+                    "name": "entity.name.function.qyro"
+                },
+                "3": {
+                    "name": "string.quoted.qyro"
+                }
             },
             "end": "(?=^>>>)",
             "contentName": "source.java",
             "patterns": [
-                { "include": "source.java" }
+                {
+                    "include": "source.java"
+                }
+            ]
+        },
+        "go-block": {
+            "begin": "^>>>(go|golang):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.qyro"
+                },
+                "2": {
+                    "name": "entity.name.function.qyro"
+                },
+                "3": {
+                    "name": "string.quoted.qyro"
+                }
+            },
+            "end": "(?=^>>>)",
+            "contentName": "source.go",
+            "patterns": [
+                {
+                    "include": "source.go"
+                }
+            ]
+        },
+        "c-block": {
+            "begin": "^>>>(c):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.qyro"
+                },
+                "2": {
+                    "name": "entity.name.function.qyro"
+                },
+                "3": {
+                    "name": "string.quoted.qyro"
+                }
+            },
+            "end": "(?=^>>>)",
+            "contentName": "source.c",
+            "patterns": [
+                {
+                    "include": "source.c"
+                }
+            ]
+        },
+        "cpp-block": {
+            "begin": "^>>>(cpp|c\\+\\+):([\\w-]+)(?:\\s*\\[(.*?)\\])?",
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.qyro"
+                },
+                "2": {
+                    "name": "entity.name.function.qyro"
+                },
+                "3": {
+                    "name": "string.quoted.qyro"
+                }
+            },
+            "end": "(?=^>>>)",
+            "contentName": "source.cpp",
+            "patterns": [
+                {
+                    "include": "source.cpp"
+                }
             ]
         }
     }
